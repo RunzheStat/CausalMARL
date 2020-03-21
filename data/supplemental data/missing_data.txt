@@ -1,0 +1,249 @@
+[1] "Wuhan"
+integer(0)
+[1] "Xiaogan"
+integer(0)
+[1] "Huanggang"
+integer(0)
+[1] "Jingzhou"
+integer(0)
+[1] "Ezhou"
+[1] 1
+[1] "Suizhou"
+[1] 1
+[1] "Xiangyang"
+[1] 1
+[1] "Huangshi"
+[1] 1
+[1] "Yichang"
+integer(0)
+[1] "Jingmen"
+integer(0)
+[1] "Xianning"
+[1] 1 2
+[1] "Shiyan"
+integer(0)
+[1] "Xiantao"
+integer(0)
+[1] "Enshi"
+[1] 1
+[1] "Qianjiang"
+[1] 1 2 3
+[1] "Beijing"
+integer(0)
+[1] "Tianjin"
+[1]  1  2 39 41
+[1] "Shanghai"
+[1] 1 2 3
+[1] "Chongqing"
+integer(0)
+[1] "Hefei"
+integer(0)
+[1] "Bengbu"
+integer(0)
+[1] "Fuyang"
+integer(0)
+[1] "Bozhou"
+integer(0)
+[1] "Fuzhou.f"
+integer(0)
+[1] "Shenzhen"
+integer(0)
+[1] "Guangzhou"
+integer(0)
+[1] "Xinyang"
+integer(0)
+[1] "Zhengzhou"
+integer(0)
+[1] "Nanyang"
+[1] 1
+[1] "Zhumadian"
+[1] 1
+[1] "Qiqihar"
+[1] 1 2
+[1] "Harbin"
+integer(0)
+[1] "Changsha"
+integer(0)
+[1] "Nanjing"
+integer(0)
+[1] "Suzhou"
+integer(0)
+[1] "Xuzhou"
+[1] 1 2 3
+[1] "Nanchang"
+integer(0)
+[1] "Xinyu"
+integer(0)
+[1] "Shangrao"
+[1] 1
+[1] "Jiujiang"
+integer(0)
+[1] "Yichun"
+[1] 1
+[1] "Ganzhou"
+[1] 1
+[1] "Fuzhou.j"
+integer(0)
+[1] "Jinan"
+integer(0)
+[1] "Xi.an"
+[1] 40
+[1] "Chengdu"
+integer(0)
+[1] "Wenzhou"
+integer(0)
+[1] "Hangzhou"
+integer(0)
+[1] "Ningbo"
+integer(0)
+[1] "Taizhou"
+integer(0)
+$Wuhan
+integer(0)
+
+$Xiaogan
+integer(0)
+
+$Huanggang
+integer(0)
+
+$Jingzhou
+integer(0)
+
+$Ezhou
+[1] 1
+
+$Suizhou
+[1] 1
+
+$Xiangyang
+[1] 1
+
+$Huangshi
+[1] 1
+
+$Yichang
+integer(0)
+
+$Jingmen
+integer(0)
+
+$Xianning
+[1] 1 2
+
+$Shiyan
+integer(0)
+
+$Xiantao
+integer(0)
+
+$Enshi
+[1] 1
+
+$Qianjiang
+[1] 1 2 3
+
+$Beijing
+integer(0)
+
+$Tianjin
+[1]  1  2 39 41
+
+$Shanghai
+[1] 1 2 3
+
+$Chongqing
+integer(0)
+
+$Hefei
+integer(0)
+
+$Bengbu
+integer(0)
+
+$Fuyang
+integer(0)
+
+$Bozhou
+integer(0)
+
+$Fuzhou.f
+integer(0)
+
+$Shenzhen
+integer(0)
+
+$Guangzhou
+integer(0)
+
+$Xinyang
+integer(0)
+
+$Zhengzhou
+integer(0)
+
+$Nanyang
+[1] 1
+
+$Zhumadian
+[1] 1
+
+$Qiqihar
+[1] 1 2
+
+$Harbin
+integer(0)
+
+$Changsha
+integer(0)
+
+$Nanjing
+integer(0)
+
+$Suzhou
+integer(0)
+
+$Xuzhou
+[1] 1 2 3
+
+$Nanchang
+integer(0)
+
+$Xinyu
+integer(0)
+
+$Shangrao
+[1] 1
+
+$Jiujiang
+integer(0)
+
+$Yichun
+[1] 1
+
+$Ganzhou
+[1] 1
+
+$Fuzhou.j
+integer(0)
+
+$Jinan
+integer(0)
+
+$Xi.an
+[1] 40
+
+$Chengdu
+integer(0)
+
+$Wenzhou
+integer(0)
+
+$Hangzhou
+integer(0)
+
+$Ningbo
+integer(0)
+
+$Taizhou
+integer(0)
