@@ -26,11 +26,12 @@ from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import DotProduct, WhiteKernel
 
 from numpy.random import lognormal as rlogN
-#############################################################################
+
 from sklearn.metrics.pairwise import rbf_kernel as GRBF
 from numpy.linalg import solve
-#############################################################################
-#############################################################################
+from scipy.stats import binom
+
+##########################################################################################################################################################
 
 def adj2neigh(adj_mat):
     neigh = {}
@@ -45,6 +46,7 @@ def adj2neigh(adj_mat):
 
 
 def Ta_disc(ta):
+    # regardless of n_neigh
         if ta <= 2/8:
             return 0
         if ta <= 5/8:
@@ -52,13 +54,21 @@ def Ta_disc(ta):
         else:
             return 2
 
-#############################################################################
+def den_b_disc(Ta, N_neigh): 
+    # N_neigh is not a constant
+    den = 0
+    for i in range(N_neigh):
+        if Ta_disc(i / N_neigh) == Ta:
+            den += binom.pmf(i, N_neigh, 0.5)
+    return den
+
+##########################################################################################################################################################
 def getAdjGrid(l):
     """
     simple: only 4 neigh
     
     """
-    simple = True
+    simple = False
     N = l ** 2
     adj_mat = zeros((N, N))
     for i in range(N):

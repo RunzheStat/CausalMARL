@@ -4,23 +4,25 @@ The majority is adapted from the source code of the paper "Breaking the Curse of
     Date: 02/27/2020.
     URL: https://github.com/zt95/infinite-horizon-off-policy-estimation/blob/master/sumo/Density_ratio_continuous.py#L48
 """
-#######
+##########################################################################################################################################################
 import numpy as np
 from _uti_basic import *
+from _utility import *
+
 import tensorflow as tf
 from time import sleep
 import sys
 from scipy.stats import binom
 
 
-####### Mute Warnings
+####### Mute Warnings #############################################################################
 import logging
 logging.getLogger('tensorflow').setLevel(logging.ERROR)
 # logging.getLogger('tensorflow').disabled = True
 if type(tf.contrib) != type(tf): tf.contrib._warning = None
 import warnings
 warnings.filterwarnings('ignore')
-#######
+##########################################################################################################################################################
 
 state_batch_dim = 3 # the original is 4. why?
 
@@ -163,9 +165,11 @@ class Density_Ratio_kernel(object):
             self.state : states
             })
 
-    def train(self, SASR, policy0, policy1, 
+    def train(self, SASR, policy0, policy1, print_flag, 
               batch_size, max_iteration,
-              test_num, epsilon = 1e-3, only_state = False, n_neigh = 8, spatial = True):
+              test_num, 
+              Ta_i = None, 
+              epsilon = 1e-3, only_state = False, n_neigh = 8, spatial = True):
         """ Train the NN to get theta^*
         Input:
             policy1(state, action) is its probability
@@ -179,16 +183,23 @@ class Density_Ratio_kernel(object):
         REW = []
         for sasr in SASR:
             for state, action, next_state, reward in sasr:
-#                 PI1.append(policy1(state, action))
-                PI1.append(1) # the target policy is deterministic
+                
                 if spatial: # p_{a|s} needs to consider the neigh (only for our behaviour cases)
-                    PI0.append(0.5 * binom.pmf(action, n_neigh, 0.5))# policy0(state, action)
-                else:
+                    pi1 = int(Ta_i == action[1] and policy1(s = None, random_choose = True) == action[0])
+                    PI1.append(pi1) # the target policy is deterministic
+                    pi0 = den_b_disc(action[1], n_neigh) * 0.5
+                    PI0.append(pi0)
+                else:#                     PI1.append(1)
+                    pi1 = int(policy1(s = None, random_choose = True) == action)
+                    PI1.append(pi1)
+#                     print(int(policy1(s = None, random_choose = True)), action,"\n")
                     PI0.append(0.5) # purely random
                 S.append(state)
                 SN.append(next_state)
                 REW.append(reward) # not immediately required in DR
-        
+        if print_flag is True:
+            print("spatial is", spatial, ": #{PI1 = 1} = ", sum(PI1), "in ",  len(PI1))        
+            print("PI0:", np.mean(PI0), np.std(PI0))
         ## Normalization
         S = np.array(S)
         S_max = np.max(S, axis = 0)
@@ -251,7 +262,7 @@ class Density_Ratio_kernel(object):
                 printR("Testing error = {:.5}".format(test_loss))
                 print('Norm_w = {:.5}'.format(norm_w)," || ", 'Norm_w_next = {:.5}'.format(norm_w_next))
                 Density_ratio = self.get_density_ratio(S)
-                T = Density_ratio * PI1 / PI0 #???
+                T = Density_ratio * PI1 / PI0 
                 print('mean_reward_estimate = {:.5}'.format(np.sum(T*REW)/np.sum(T)))
                 sys.stdout.flush()
                 # epsilon *= 0.9 # for stability

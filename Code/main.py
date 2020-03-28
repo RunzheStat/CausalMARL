@@ -2,9 +2,8 @@ from _uti_basic import *
 from _utility import *
 from weight import *
 from simu_funs import *
-#############################################################################
-
-#############################################################################
+##########################################################################################################################################################
+##########################################################################################################################################################
 
 
 def V_DR(data, pi, behav, adj_mat, Ts, Ta, penalty = [[1e-2, 1e-2]], 
@@ -42,10 +41,14 @@ def V_DR(data, pi, behav, adj_mat, Ts, Ta, penalty = [[1e-2, 1e-2]],
         n_neigh = len(neigh[i])
         Ri = arr([a[2] for a in data[i]])[:T]
         tuples_i = getRegionData(data[i], i, data_neigh, pi, Ts, Ta, mean_field = True, time_dependent = time_dependent)
+        
+        
+        Ta_i = Ta_disc(np.mean([pi[j](s = None, random_choose = True) for j in neigh[i]]))
+        
         """ our method """
         Qi_diff, Vi = computeQV(tuples_i = tuples_i, R = R, 
                                 CV_QV = CV_QV, penalty_range = penalty)
-        r = getWeight(tuples_i, policy0 = behav[i], policy1 = pi[i], dim_S_plus_Ts = dim_S_plus_Ts,
+        r = getWeight(tuples_i, i, policy0 = behav[i], policy1 = pi[i], Ta_i = Ta_i, dim_S_plus_Ts = dim_S_plus_Ts,
                        time_dependent = time_dependent, n_neigh = n_neigh,
                       w_hidden = w_hidden, Learning_rate = Learning_rate,  n_layer = n_layer, 
                       batch_size = batch_size, max_iteration = max_iteration, test_num = test_num, 
@@ -89,7 +92,7 @@ def V_DR(data, pi, behav, adj_mat, Ts, Ta, penalty = [[1e-2, 1e-2]],
                                 CV_QV = CV_QV, penalty_range = penalty, spatial = False)
             QV_NS = Vi_NS[0]
             
-            wi_NS = getWeight(tuples_i, policy0 = behav[i], policy1 = pi[i], dim_S_plus_Ts = dim_S_plus_Ts,
+            wi_NS = getWeight(tuples_i, i, policy0 = behav[i], policy1 = pi[i], Ta_i = Ta_i, dim_S_plus_Ts = dim_S_plus_Ts,
                               time_dependent = time_dependent, n_neigh = n_neigh, 
                           w_hidden = w_hidden, Learning_rate = Learning_rate,  n_layer = n_layer, 
                           batch_size = batch_size, max_iteration = max_iteration, test_num = test_num, epsilon = epsilon, 
@@ -100,14 +103,8 @@ def V_DR(data, pi, behav, adj_mat, Ts, Ta, penalty = [[1e-2, 1e-2]],
             DR_V_NS = wi_NS * (Ri + Qi_diff_NS)
             IS_NS = wi_NS * Ri
             
-        
-#             DR_V = IS_V =  DR2_V = 0
-#             DR_V_NS = IS_NS = 0
-    
-            values_i = [np.mean(DR_V), QV_V, np.mean(IS_V), np.mean(DR_V_NS), QV_NS, np.mean(IS_NS), np.mean(DR2_V), V_behav]
-            
-            # print("values for region", i, " = ", values_i)
-            
+            values_i = [np.mean(DR_V), QV_V, np.mean(IS_V), np.mean(DR_V_NS), QV_NS, np.mean(IS_NS), V_behav] # np.mean(DR2_V), 
+                        
             return values_i
         else:
             return np.mean(DR_V)
@@ -119,6 +116,8 @@ def V_DR(data, pi, behav, adj_mat, Ts, Ta, penalty = [[1e-2, 1e-2]],
             
     Vs = np.round(np.mean(r, 0), 3)
     return Vs
+
+##########################################################################################################################################################
 
 """ Transform the data into transition tuples and extract spatial dependence statistics. 
 Output:
@@ -156,25 +155,31 @@ def getRegionData(data_i, i, data_neigh, pi, Ts, Ta, mean_field = True, time_dep
         tuples_i.append(tuple_t)
     return tuples_i
 
+##### IS #####################################################################################################################################################
+
 """ Compute the transition tuple density ratios for region i. [Breaking, Lihong]
 Input:  
     tuples_i[t] = [S_it, A_it, R_it, Tsit, Tait,  # 0 - 4
                     S_i(t+1), Tsi(t+1), pi_Sit_1, T_ait_1_pi] # 5 - 8
-    What we want: SASR_i = [a list of [S,A,S',R]]; R is useless 
+        - what we want: SASR_i = [a list of [S,A,S',R]]; R is useless 
+    policy0 = behav[i]
+    policy1 = pi[i]
 Output: a vector of density ratios.
 """
-def getWeight(tuples_i, policy0, policy1, dim_S_plus_Ts, time_dependent = False, 
+def getWeight(tuples_i, i, policy0, policy1, Ta_i, dim_S_plus_Ts, time_dependent = False, 
               w_hidden = 10, Learning_rate = 1e-4,  n_layer = 2, 
               n_neigh = 8, 
               batch_size = 64, max_iteration = 1001, test_num = 0, epsilon = 1e-3,
-             spatial = True, isValidation = False):
+              spatial = True, isValidation = False):
     # prepare transition pairs
     reg_weight = 0 # no penalty in the two-layer NN
+    
+    # S, A, S', R
     if spatial:
         def concateOne(tuplet):
             # only for our cases
             return [np.concatenate((tuplet[0], tuplet[3]), axis=None), 
-                   tuplet[4],
+                   [tuplet[1], tuplet[4]], # [A, Ta]
                     np.concatenate((tuplet[5], tuplet[6]), axis=None), 
                    tuplet[2]]
 #             return [np.concatenate((tuplet[0], tuplet[3]), axis=None), 
@@ -186,17 +191,9 @@ def getWeight(tuples_i, policy0, policy1, dim_S_plus_Ts, time_dependent = False,
             return [tuplet[0], tuplet[1],
                     tuplet[5], tuplet[2]]
     SASR_i = [concateOne(tuplet) for tuplet in tuples_i]
-    
-    # normalization: NA
-#     for i in range(4):
-#         sd = np.std(arr([a[i] for a in SASR_i]), 0)
-#         print("sd:", sd)
-#         for j in range(len(SASR_i)):
-#             SASR_i[j][i] /= sd
-#             if j == 0:
-#                 print(SASR_i[j][i])
     SASR_i = [SASR_i] # although we only need 1 layer of list
         
+    # Dim and Initialization
     if spatial:
         computeWeight = Density_Ratio_kernel(obs_dim = dim_S_plus_Ts, n_layer = n_layer, 
                                      w_hidden = w_hidden, Learning_rate = Learning_rate, reg_weight = reg_weight)
@@ -207,15 +204,28 @@ def getWeight(tuples_i, policy0, policy1, dim_S_plus_Ts, time_dependent = False,
             obs_dim = int(dim_S_plus_Ts / 2)
         computeWeight = Density_Ratio_kernel(obs_dim = obs_dim, n_layer = n_layer, 
                                      w_hidden = w_hidden, Learning_rate = Learning_rate, reg_weight = reg_weight)
-    
-    weights = computeWeight.train(SASR_i, policy0, policy1, 
+    """
+    data is from the behaviour
+    def behav(s, a):
+        return 0.5
+    def pi_i(s, a = 0, random_choose = False, reward = reward):
+            if random_choose:
+                return reward
+            else:
+                return int(a == reward)
+    """
+#     if i in [0, 6, 12]:
+#         print_flag = True
+#     else:
+    print_flag = False
+    weights = computeWeight.train(SASR_i, policy0, policy1, Ta_i = Ta_i, print_flag = print_flag, 
               batch_size = batch_size, max_iteration = max_iteration, n_neigh = n_neigh, 
               test_num = test_num, epsilon = epsilon, only_state = isValidation, spatial = spatial)
     computeWeight.close_Session()
     
     return weights, SASR_i
 
-
+#### QV ######################################################################################################################################################
 
 """ Value functions [Susan Murphy] w/o CV
 Input:
@@ -279,34 +289,42 @@ def computeQV_basic(tuples_i, R, penalty, spatial = True,
     
     ## get (S,A) pair
     if spatial:
-        Z = np.array([np.concatenate((a[0], [a[1]], a[3], [a[4]])) for a in tuples_i]) # T * p. [S, A, Ts, Ta]
-        Zstar = np.array([np.concatenate((a[5], [a[7]], a[6], [a[8]])) for a in tuples_i])
+        Z = np.array([np.concatenate((a[0], a[3], [a[1]], [a[4]])) for a in tuples_i]) # T * p. [S, Ts, A, Ta]
+        Zstar = np.array([np.concatenate((a[5], a[6], [a[7]], [a[8]])) for a in tuples_i])
+        ## kernel distance
+        def SA_GRBF(Z, gamma):
+            T, l = Z.shape
+            dim = int(Z.shape[1] // 2 - 1)
+            I_A = (Z[:, dim * 2].reshape(-1,1) == Z[:, dim * 2].reshape(1,-1))
+            I_Ta = (Z[:, dim * 2 + 1].reshape(-1,1) == Z[:, dim * 2 + 1].reshape(1,-1))
+            I_A = np.multiply(I_A, I_Ta)
+            K = GRBF(Z[:,:(l - 2)], Z[:,:(l - 2)], gamma) + identity(T) * 1e-8
+            return np.multiply(K, I_A)        
     else:
         Z = np.array([np.concatenate((a[0], [a[1]])) for a in tuples_i]) # T * p. [S, A, Ts, Ta]
         Zstar = np.array([np.concatenate((a[5], [a[7]])) for a in tuples_i])
-    
+        ## kernel distance
+        def SA_GRBF(Z, gamma):
+            T, l = Z.shape
+            dim = int(Z.shape[1] - 1)
+            I_A = (Z[:, dim].reshape(-1,1) == Z[:, dim].reshape(1,-1))
+            K = GRBF(Z[:,:(l - 1)], Z[:,:(l - 1)], gamma) + identity(T) * 1e-8
+            return np.multiply(K, I_A)    
     
     Z_tilde = np.vstack((Z, Zstar))
-    
-    ## kernel distance
-    def SA_GRBF(Z, gamma):
-        l = Z.shape[1] - 1
-        T = Z.shape[0]
-        A = Z[:, -1]
-        A_mat = (A.reshape(-1,1) == A.reshape(1,-1))
-
-        K = GRBF(Z[:,:(l-1)], Z[:,:(l-1)], gamma) + identity(T) * 1e-8
-        return np.multiply(K, A_mat)
-    
-    gamma_g = 1 / (2 * np.median(pdist(Z[:,:(Z.shape[1]-1)]))**2)
-    gamma_q = 1 / (2 * np.median(pdist(Z_tilde[:,:(Z_tilde.shape[1]-1)]))**2)
+    if spatial:
+        gamma_g = 1 / (2 * np.median(pdist(Z[:,:(Z.shape[1]-2)]))**2)
+        gamma_q = 1 / (2 * np.median(pdist(Z_tilde[:,:(Z_tilde.shape[1]-2)]))**2)
+    else:
+        gamma_g = 1 / (2 * np.median(pdist(Z[:,:(Z.shape[1]-1)]))**2)
+        gamma_q = 1 / (2 * np.median(pdist(Z_tilde[:,:(Z_tilde.shape[1]-1)]))**2)
+        
     Kg = SA_GRBF(Z, gamma_g)
     KQ = SA_GRBF(Z_tilde, gamma_q)
     # centeralization, p11
-    ZTstar = np.mean(Z_tilde, 0)
-    
-    KQ = KQ - GRBF(Z_tilde, ZTstar.reshape(1, -1), gamma_q) - GRBF(ZTstar.reshape(1, -1), 
-                                                                   Z_tilde, gamma_q) - GRBF(ZTstar.reshape(1, -1), ZTstar.reshape(1, -1), gamma_q)[0][0]
+#     ZTstar = np.mean(Z_tilde, 0)
+#     KQ = KQ - GRBF(Z_tilde, ZTstar.reshape(1, -1), gamma_q) - GRBF(ZTstar.reshape(1, -1), 
+#                                                                    Z_tilde, gamma_q) - GRBF(ZTstar.reshape(1, -1), ZTstar.reshape(1, -1), gamma_q)[0][0]
     
     ## Idnetity vec/mat
     C = np.hstack((-identity(T),identity(T)))       
@@ -349,6 +367,8 @@ def computeQV_basic(tuples_i, R, penalty, spatial = True,
         Qi_diff = Qvalues[0, T:] - Qvalues[0, :T] # Q^* - Q
         return Qi_diff, Vi
 
+##########################################################################################################################################################
+##########################################################################################################################################################
     #- GRBF(Z, Zstar.reshape(1, -1), gamma_g) - GRBF(Zstar.reshape(1, -1), Z, gamma_g)  - GRBF(Zstar.reshape(1, -1), Zstar.reshape(1, -1), gamma_g)[0][0]
 
 """ 3. DR w/o mean field (not yet) """
@@ -362,3 +382,14 @@ def computeQV_basic(tuples_i, R, penalty, spatial = True,
 #                           spatial = True)
 #             DR_V_NMF = wi_NS * (Ri + Qi_diff_NS - np.squeeze(arr(list(itertools.repeat(Vi_NS, T))))) + Vi
 #             return [np.mean(DR_V), np.mean(IS_V), Susan_V, np.mean(DR_V_NS), np.mean(DR_V_NMF)]
+
+
+    
+    # normalization: NA
+#     for i in range(4):
+#         sd = np.std(arr([a[i] for a in SASR_i]), 0)
+#         print("sd:", sd)
+#         for j in range(len(SASR_i)):
+#             SASR_i[j][i] /= sd
+#             if j == 0:
+#                 print(SASR_i[j][i])

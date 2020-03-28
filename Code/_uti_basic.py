@@ -29,6 +29,8 @@ from matplotlib.pyplot import hist
 from sklearn.model_selection import GridSearchCV
 
 import os
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
 
 np.set_printoptions(precision = 4)
 #############################################################################
@@ -136,10 +138,6 @@ def print_time_cost(seed,total_rep,time):
 def is_disc(v, n):
     return len(set(v)) <= n
 
-
-def rangeofVec(v, precision = 2):
-    return [np.round(np.quantile(v, [0.01, 0.1, 0.5, 0.9, 0.99]), precision),  np.round(max(abs(v)), precision)]
-
 def R2(y_true, y_pred):
     unexplained = np.mean((y_true - y_pred)**2) 
     true_var = np.mean((y_true - np.mean(y_true))**2)
@@ -149,3 +147,11 @@ def R2(y_true, y_pred):
 def print_progress(i, N):
     if (i * 100 // N == 0):
         print("#", end = "", flush = True)
+
+        
+def rangeofVec(v, precision = 2):
+    # np.mean(), np.std()
+    return [np.round(np.quantile(v, [0.01, 0.1, 0.5, 0.9, 0.99]), precision),  np.round(max(abs(v)), precision)]
+
+def uv(v, precision = 3):
+    return np.round([np.mean(v), np.std(v)], precision)

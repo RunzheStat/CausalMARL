@@ -1,7 +1,7 @@
 from _uti_basic import *
 from _utility import *
 
-#############################################################################
+##########################################################################################################################################################
 """
     1. behaviour policy: always random 0.5 reward (DG-level)
     2. target policy
@@ -13,51 +13,42 @@ from _utility import *
         adj_mat: binary adjacent matrix
         [[O, D, M], A, R]
 """
-def DG_once(seed = 1, l = 5, T = 240, time_dependent = False, w_A = 1, w_O = 1, sd_R  = 1, sd_D = 1, 
-            u_O = None, p_behav = 0.5, M_in_R = True, #True,
-           TARGET = False, target_policy = None, T_burn_in = 50, dynamics = "new"):  
-    """ prepare data
+def DG_once(seed = 1, l = 5, T = 14 * 48, time_dependent = False, w_A = 1, w_O = 1, sd_R  = 1, sd_D = 1, 
+            u_O = None, M_in_R = True, #True,
+           TARGET = False, target_policy = None, T_burn_in = 100, dynamics = "old"):  
+    """ prepare data (fixed)
     """
     T = T + T_burn_in
     npseed(seed)
     N = l ** 2
-    
-    """ weight in the definition of mismatch
-    """
-    w_M = 0.5 # 0.8
     adj_mat = getAdjGrid(l)
+    p_behav = 0.5
+    # random errors for D and R
+    e_D = (rpoisson(1, (N, T)) - 1) * sd_D
+    e_R = randn(N, T) * sd_R
+    # initialization
+    M = [runi(0, 1, N)] 
+    R = []
     
-    """ O: the pattern (spatial distribution) of orders
+    """ TUNE
     """
-#     O = rpoisson(u_O, (T, N)).T
-    
-    """ debug: is the variaance of O too large? learn nothing?
-    """
+    # weight in the definition of mismatch
+
+    w_M = 0.5     # 0.8
+    # O: the pattern (spatial distribution) of orders
+    #     O = rpoisson(u_O, (T, N)).T    
+    ## debug: is the variaance of O too large? learn nothing?
     O = np.repeat(u_O, T).reshape(N, T) +  (rpoisson(1, (N, T)) - 1) #randn(N,T) #/ 10
-#     O = max(O, 0)
     O[O < 0] = 0
-    
-    """ D: initial is the same with driver. then attract by the A and O. burn-in.
-    """
-    u_D = np.mean(u_O)
-    D = [arr([u_D for i in range(N)])]
-    
-    """ Actions
-    """
+    # Actions
     if TARGET: # target. fixed. 
         A = arr([[target_policy[i](None, random_choose = True) for j in range(T)] for i in range(N)])
     else: # behaviour policy: random
         A = rbin(1, p_behav, (N, T))
     
-    """ random errors for D and R
-    """
-    e_D = (rpoisson(1, (N,T)) - 1) * sd_D
-    e_R = randn(N, T) * sd_R
-
-    """ initialization
-    """
-    M = [runi(0, 1, N)] 
-    R = []
+    # D: initial is the same with driver. then attract by the A and O. burn-in.
+    u_D = np.mean(u_O)
+    D = [arr([u_D for i in range(N)])]
     
     """ MAIN: state trasition and reward calculation [no action selection]
     """
@@ -79,7 +70,7 @@ def DG_once(seed = 1, l = 5, T = 240, time_dependent = False, w_A = 1, w_O = 1, 
             D.append(D_t)
         else:
                 
-            Attr_OD = w_O * squeeze(O[:, t - 1]) / (1 + squeeze(D[t - 1]))
+            Attr_OD = w_O * (squeeze(O[:, t - 1]) / (1 + squeeze(D[t - 1])))
             Attr = np.exp(w_A * A[:, t - 1]) + squeeze(Attr_OD) ## * at first
             Attr_mat = np.repeat(Attr, N).reshape(N, N)
             Attr_adj = np.multiply(Attr_mat, adj_mat)
@@ -87,27 +78,28 @@ def DG_once(seed = 1, l = 5, T = 240, time_dependent = False, w_A = 1, w_O = 1, 
             
             D_t = squeeze(Attr_adj.dot((D[t - 1] / squeeze(Attr_neigh)).reshape(-1, 1)))
             D.append(D_t)
-        """ New Order and Mismatch
-        """
-        O_t = O[:, t]
-        M_t = w_M * (1 - abs(D_t - O_t) / abs(1 + D_t + O_t)) + (1 - w_M) * M[t - 1]
-        M.append(M_t)
+        O_t = O[:, t] 
         
-        """ Reward definitions
+        """ Tune: M and R 
         """
+        M_t = w_M * (1 - abs(D_t - O_t) / abs(1 + D_t + O_t)) + (1 - w_M) * M[t - 1]
+        # R_{t - 1}
         if M_in_R:
-            R_t_1 = M_t * np.minimum(D_t, O_t) + e_R[:, t] # R_{t - 1}
+            R_t_1 = M_t * np.minimum(D_t, O_t) + e_R[:, t] 
         else:
             R_t_1 = np.minimum(D_t, O_t) + e_R[:, t]
+        
+        M.append(M_t)
         R.append(R_t_1)
     R.append(R_t_1) # add one more? # new reward?
-    
+
+    """ organization
+    """
     ## organization and burn-in; N * T
     R = arr(R).T[:, T_burn_in:]; D = arr(D).T[:, T_burn_in:]; M = arr(M).T[:, T_burn_in:]
     O = O[:, T_burn_in:]; A = A[:, T_burn_in:]
-        
-    """ reorganization
-    """
+    
+    ## reorganization
     data = []
     for i in range(N):
         data_i = []
@@ -117,7 +109,7 @@ def DG_once(seed = 1, l = 5, T = 240, time_dependent = False, w_A = 1, w_O = 1, 
     
     return data, adj_mat, [[O, D, M], A, R]
 
-
+##########################################################################################################################################################
 
 """ generate the target policy (fixed reward regions) randomly / based on u_O
 """
@@ -139,7 +131,7 @@ def simu_target_policy_pattern(pattern_seed = 1, l = 3, u_O = None, threshold = 
     ## Transform fixed_policy (0/1) to policy (pi)
     pi = []
     for reward in fixed_policy:
-        def pi_i(s, a = 0, random_choose = False, reward = reward):
+        def pi_i(s = None, a = 0, random_choose = False, reward = reward):
             if random_choose:
                 return reward
             else:
@@ -164,7 +156,7 @@ def simu_target_policy_pattern(pattern_seed = 1, l = 3, u_O = None, threshold = 
                 print("\n")
     return pi
 
-
+##########################################################################################################################################################
 
 # mean reversion for stationality; 
             # then how about attraction? not ideal? action effect?
