@@ -89,20 +89,20 @@ def V_DR(data, pi, behav, adj_mat, Ts, Ta, penalty = [[1e-2, 1e-2]],
                                 CV_QV = CV_QV, penalty_range = penalty, spatial = False)
             QV_NS = Vi_NS[0]
             
-#             wi_NS = getWeight(tuples_i, policy0 = behav[i], policy1 = pi[i], dim_S_plus_Ts = dim_S_plus_Ts,
-#                               time_dependent = time_dependent, n_neigh = n_neigh, 
-#                           w_hidden = w_hidden, Learning_rate = Learning_rate,  n_layer = n_layer, 
-#                           batch_size = batch_size, max_iteration = max_iteration, test_num = test_num, epsilon = epsilon, 
-#                           spatial = False)
-#             wi_NS = wi_NS[0]
-#             wi_NS /= np.mean(wi_NS) 
+            wi_NS = getWeight(tuples_i, policy0 = behav[i], policy1 = pi[i], dim_S_plus_Ts = dim_S_plus_Ts,
+                              time_dependent = time_dependent, n_neigh = n_neigh, 
+                          w_hidden = w_hidden, Learning_rate = Learning_rate,  n_layer = n_layer, 
+                          batch_size = batch_size, max_iteration = max_iteration, test_num = test_num, epsilon = epsilon, 
+                          spatial = False)
+            wi_NS = wi_NS[0]
+            wi_NS /= np.mean(wi_NS) 
 
-#             DR_V_NS = wi_NS * (Ri + Qi_diff_NS)
-#             IS_NS = wi_NS * Ri
+            DR_V_NS = wi_NS * (Ri + Qi_diff_NS)
+            IS_NS = wi_NS * Ri
             
         
 #             DR_V = IS_V =  DR2_V = 0
-            DR_V_NS = IS_NS = 0
+#             DR_V_NS = IS_NS = 0
     
             values_i = [np.mean(DR_V), QV_V, np.mean(IS_V), np.mean(DR_V_NS), QV_NS, np.mean(IS_NS), np.mean(DR2_V), V_behav]
             
@@ -176,7 +176,11 @@ def getWeight(tuples_i, policy0, policy1, dim_S_plus_Ts, time_dependent = False,
             return [np.concatenate((tuplet[0], tuplet[3]), axis=None), 
                    tuplet[4],
                     np.concatenate((tuplet[5], tuplet[6]), axis=None), 
-                   tuplet[8]]
+                   tuplet[2]]
+#             return [np.concatenate((tuplet[0], tuplet[3]), axis=None), 
+#                    tuplet[4],
+#                     np.concatenate((tuplet[5], tuplet[6]), axis=None), 
+#                    tuplet[8]]
     else:
         def concateOne(tuplet):
             return [tuplet[0], tuplet[1],
@@ -273,8 +277,6 @@ def computeQV_basic(tuples_i, R, penalty, spatial = True,
     mu, lam = penalty
     A_set = set([a[1] for a in tuples_i])
     
-    
-    
     ## get (S,A) pair
     if spatial:
         Z = np.array([np.concatenate((a[0], [a[1]], a[3], [a[4]])) for a in tuples_i]) # T * p. [S, A, Ts, Ta]
@@ -283,28 +285,36 @@ def computeQV_basic(tuples_i, R, penalty, spatial = True,
         Z = np.array([np.concatenate((a[0], [a[1]])) for a in tuples_i]) # T * p. [S, A, Ts, Ta]
         Zstar = np.array([np.concatenate((a[5], [a[7]])) for a in tuples_i])
     
-    # Normalization: have a try. 03/25 night.
-    Z = pre.scale(Z, axis=0)
-    Zstar = pre.scale(Zstar, axis=0)
     
     Z_tilde = np.vstack((Z, Zstar))
     
     ## kernel distance
-    gamma_g = 1 / (2 * np.median(pdist(Z))**2); gamma_q = 1 / (2 * np.median(pdist(Z_tilde))**2)
-    Kg = GRBF(Z, Z, gamma_g) + identity(T) * 1e-8
-    KQ = GRBF(Z_tilde, Z_tilde, gamma_q) + identity(2 * T) * 1e-8
+    def SA_GRBF(Z, gamma):
+        l = Z.shape[1] - 1
+        T = Z.shape[0]
+        A = Z[:, -1]
+        A_mat = (A.reshape(-1,1) == A.reshape(1,-1))
+
+        K = GRBF(Z[:,:(l-1)], Z[:,:(l-1)], gamma) + identity(T) * 1e-8
+        return np.multiply(K, A_mat)
+    
+    gamma_g = 1 / (2 * np.median(pdist(Z[:,:(Z.shape[1]-1)]))**2)
+    gamma_q = 1 / (2 * np.median(pdist(Z_tilde[:,:(Z_tilde.shape[1]-1)]))**2)
+    Kg = SA_GRBF(Z, gamma_g)
+    KQ = SA_GRBF(Z_tilde, gamma_q)
     # centeralization, p11
     ZTstar = np.mean(Z_tilde, 0)
+    
     KQ = KQ - GRBF(Z_tilde, ZTstar.reshape(1, -1), gamma_q) - GRBF(ZTstar.reshape(1, -1), 
                                                                    Z_tilde, gamma_q) - GRBF(ZTstar.reshape(1, -1), ZTstar.reshape(1, -1), gamma_q)[0][0]
     
     ## Idnetity vec/mat
-    C = np.hstack((-identity(T),identity(T)))        
-    vec1, I = ones(T), identity(T)
+    C = np.hstack((-identity(T),identity(T)))       
+    vec1, I = ones(T).reshape(-1,1), identity(T)
     
     E_right_bef_inverse = Kg + T * mu * I # RHS of E
     
-    CKQ_1 = np.hstack((C.dot(KQ), np.expand_dims(-vec1, 1))) # [CK_Q, -1]
+    CKQ_1 = np.hstack((C.dot(KQ), -vec1))
     ECKQ1 = Kg.T.dot(solve(E_right_bef_inverse, CKQ_1)) # E[CK_Q,-1]
     
     left = (ECKQ1.T.dot(ECKQ1) + np.vstack((np.hstack((T * lam * KQ, zeros((2 * T, 1)))), zeros((1, 2 * T + 1))))) # Left part of (\hat{\alpha}, \hat{\eta})

@@ -180,7 +180,7 @@ class Density_Ratio_kernel(object):
         for sasr in SASR:
             for state, action, next_state, reward in sasr:
 #                 PI1.append(policy1(state, action))
-                PI1.append(1) # fixed
+                PI1.append(1) # the target policy is deterministic
                 if spatial: # p_{a|s} needs to consider the neigh (only for our behaviour cases)
                     PI0.append(0.5 * binom.pmf(action, n_neigh, 0.5))# policy0(state, action)
                 else:

@@ -14,8 +14,8 @@ from _utility import *
         [[O, D, M], A, R]
 """
 def DG_once(seed = 1, l = 5, T = 240, time_dependent = False, w_A = 1, w_O = 1, sd_R  = 1, sd_D = 1, 
-            u_O = 12, p_behav = 0.5, M_in_R = True, #True,
-           OPE = False, target_policy = None, T_burn_in = 50, mean_reversion = False, dynamics = "new"):  
+            u_O = None, p_behav = 0.5, M_in_R = True, #True,
+           TARGET = False, target_policy = None, T_burn_in = 50, dynamics = "new"):  
     """ prepare data
     """
     T = T + T_burn_in
@@ -24,24 +24,18 @@ def DG_once(seed = 1, l = 5, T = 240, time_dependent = False, w_A = 1, w_O = 1, 
     
     """ weight in the definition of mismatch
     """
-    w_M = 0.8 
+    w_M = 0.5 # 0.8
     adj_mat = getAdjGrid(l)
     
     """ O: the pattern (spatial distribution) of orders
     """
-    is_homogenous = isinstance(u_O, int)
-    if is_homogenous: # u_O is a number
-        if time_dependent:
-            mean_OD = [10 * (2 - sin(t/48*2*np.pi)) for t in range(T)]
-            O = rpoisson(mean_OD, (N, T))
-        else: # generate orders from poission distribution with E(O) = u_O
-            O = rpoisson(u_O, (N, T))  
-    else: # list, heterogenous 
-        O = rpoisson(u_O, (T, N)).T
+#     O = rpoisson(u_O, (T, N)).T
     
     """ debug: is the variaance of O too large? learn nothing?
     """
-    O = np.repeat(u_O, T).reshape(N, T) + randn(N,T) #/ 10
+    O = np.repeat(u_O, T).reshape(N, T) +  (rpoisson(1, (N, T)) - 1) #randn(N,T) #/ 10
+#     O = max(O, 0)
+    O[O < 0] = 0
     
     """ D: initial is the same with driver. then attract by the A and O. burn-in.
     """
@@ -50,7 +44,7 @@ def DG_once(seed = 1, l = 5, T = 240, time_dependent = False, w_A = 1, w_O = 1, 
     
     """ Actions
     """
-    if OPE: # target. fixed. 
+    if TARGET: # target. fixed. 
         A = arr([[target_policy[i](None, random_choose = True) for j in range(T)] for i in range(N)])
     else: # behaviour policy: random
         A = rbin(1, p_behav, (N, T))
@@ -96,7 +90,7 @@ def DG_once(seed = 1, l = 5, T = 240, time_dependent = False, w_A = 1, w_O = 1, 
         """ New Order and Mismatch
         """
         O_t = O[:, t]
-        M_t = w_M * (1 - abs(D_t - O_t) / abs(D_t + O_t)) + (1 - w_M) * M[t - 1]
+        M_t = w_M * (1 - abs(D_t - O_t) / abs(1 + D_t + O_t)) + (1 - w_M) * M[t - 1]
         M.append(M_t)
         
         """ Reward definitions
@@ -127,7 +121,7 @@ def DG_once(seed = 1, l = 5, T = 240, time_dependent = False, w_A = 1, w_O = 1, 
 
 """ generate the target policy (fixed reward regions) randomly / based on u_O
 """
-def simu_target_policy_pattern(pattern_seed = 1, l = 3, random = True, u_O = None, threshold = 12, print_flag = True, noise = False):
+def simu_target_policy_pattern(pattern_seed = 1, l = 3, u_O = None, threshold = 12, print_flag = True, noise = False):
     
     if u_O is not None: # generate target based on the order
         N = len(u_O)
@@ -136,13 +130,7 @@ def simu_target_policy_pattern(pattern_seed = 1, l = 3, random = True, u_O = Non
     else: # randomly  generate the target policy
         npseed(pattern_seed)
         N = l**2
-        if random:
-            fixed_policy = rbin(1, 0.5, N)
-        else:
-            """ fixed number: half as reward
-            """
-            reward_place = np.random.choice(N, N//2, replace = False)
-            fixed_policy = [int(b in reward_place) for b in range(N)]
+        fixed_policy = rbin(1, 0.5, N)
     if noise:
         e = np.random.choice(N, int(N//5), replace = False)
         fixed_policy -= e
@@ -204,3 +192,19 @@ def simu_target_policy_pattern(pattern_seed = 1, l = 3, random = True, u_O = Non
 #             R_neigh.append(R[j,:])
 #         R_spatial_more.append(R[i,:] + np.mean(R_neigh, 0))
 #     R = arr(R_spatial_more)
+
+
+# is_homogenous = isinstance(u_O, int)
+#     if is_homogenous: # u_O is a number
+#         if time_dependent:
+#             mean_OD = [10 * (2 - sin(t/48*2*np.pi)) for t in range(T)]
+#             O = rpoisson(mean_OD, (N, T))
+#         else: # generate orders from poission distribution with E(O) = u_O
+#             O = rpoisson(u_O, (N, T))  
+#     else: # list, heterogenous 
+        
+# else:
+#     """ fixed number: half as reward
+#     """
+#     reward_place = np.random.choice(N, N//2, replace = False)
+#     fixed_policy = [int(b in reward_place) for b in range(N)]

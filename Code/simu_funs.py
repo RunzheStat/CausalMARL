@@ -10,7 +10,7 @@ from simu_DGP import *
 apply this MC-based function to approaximate the density ratio in observed data
 bandwitch selected by CV to be 1
 """
-def MC_validate_Weight_QV(l, u_O, time_dependent, mean_reversion, sd_D, sd_R, 
+def MC_validate_Weight_QV(l, u_O, time_dependent, sd_D, sd_R, 
                           w_A, w_O, neigh, target_policy, rep = 10):
     # tuples_i[t] = [S_it, A_it, R_it, Tsit, Tait, S_i(t+1), Tsi(t+1), pi_Sit_1, T_ait_1_pi]
     # data: a len-N list. data[i] is a len-T list, where data[i][t] is [S_{i,t}, A_{i,t}, R_{i,t}]; 
@@ -21,14 +21,14 @@ def MC_validate_Weight_QV(l, u_O, time_dependent, mean_reversion, sd_D, sd_R,
         T = 10000
         data, adj_mat, details = DG_once(seed = seed, l = l, T = T, 
                                          u_O = u_O, 
-                                         time_dependent = time_dependent, mean_reversion = mean_reversion, 
+                                         time_dependent = time_dependent,  
                                          sd_D = sd_D, sd_R = sd_R, 
                                          w_A = w_A, w_O = w_O)
 
         data_target, adj_mat, details = DG_once(seed = seed, l = l, T = T, 
                                          u_O = u_O, 
-                                         time_dependent = time_dependent, mean_reversion = mean_reversion, 
-                                         OPE = True, target_policy = target_policy, 
+                                         time_dependent = time_dependent,  
+                                         TARGET = True, target_policy = target_policy, 
                                          sd_D = sd_D, sd_R = sd_R, 
                                          w_A = w_A, w_O = w_O)
         def temp(a, random_choose = True):
@@ -101,14 +101,14 @@ def MC_validate_Weight_QV(l, u_O, time_dependent, mean_reversion, sd_D, sd_R,
 
 def simu(pattern_seed = 1,  l = 3, T = 14 * 24, # Setting - general
          OPE_rep_times = 20, n_cores = n_cores, inner_parallel = False,  # Parallel
-         random_target = True, u_O = 12, time_dependent = False, mean_reversion = False, # DGP / target
+         time_dependent = False, # DGP / target
          dim_S_plus_Ts = 3 + 3, epsilon = 1e-6,  # fixed
          sd_D = 3, sd_R = 0, # noises
          w_A = 1, w_O = .05, # Setting - spatial
          penalty = [.01, .01], CV_QV = False, # QV parameters
          n_layer = 2, w_hidden = 30, # NN structure
          Learning_rate = 1e-4, batch_size = 32, max_iteration = 1001, # NN training
-         test_num = 0, isValidation = False, on_policy_debug = False, # debug
+         test_num = 0, isValidation = False,  # debug
          file = None # echo
         ): 
     
@@ -129,6 +129,7 @@ def simu(pattern_seed = 1,  l = 3, T = 14 * 24, # Setting - general
     else: # randomly from logN
         npseed(pattern_seed)
         u_O = rlogN(2.5, .2, l**2) 
+        
     # generate the corresponding target plicy
     target_policy = simu_target_policy_pattern(u_O = u_O)
     # generate the adj for the grid
@@ -138,21 +139,20 @@ def simu(pattern_seed = 1,  l = 3, T = 14 * 24, # Setting - general
     """
     den_fun = None
     if isValidation:
-        den_fun = MC_validate_Weight_QV(l = l, u_O = u_O, time_dependent = time_dependent, mean_reversion = mean_reversion, 
+        den_fun = MC_validate_Weight_QV(l = l, u_O = u_O, time_dependent = time_dependent,  
                                         sd_D = sd_D, sd_R = sd_R, w_A = w_A, w_O = w_O, 
                                         neigh = neigh, target_policy = target_policy)        
     
     """ parallel
     """
     def once(seed):
-        return simu_once(seed = seed, l = l, T = T, time_dependent = time_dependent, mean_reversion = mean_reversion, 
+        return simu_once(seed = seed, l = l, T = T, time_dependent = time_dependent,  
                          u_O = u_O, den_fun = den_fun, 
                          target_policy = target_policy, w_A = w_A, w_O = w_O, dim_S_plus_Ts = dim_S_plus_Ts, n_cores = n_cores, 
                           penalty = penalty, n_layer = n_layer, sd_D = sd_D, sd_R = sd_R, 
                           w_hidden = w_hidden, Learning_rate = Learning_rate,  CV_QV = CV_QV, 
                           batch_size = batch_size, max_iteration = max_iteration, epsilon = epsilon, 
                           test_num = test_num, inner_parallel = inner_parallel, 
-                          on_policy_debug = on_policy_debug, 
                           isValidation = isValidation)
     if not inner_parallel:
         V_OPE = parmap(once, range(OPE_rep_times), n_cores)
@@ -161,11 +161,12 @@ def simu(pattern_seed = 1,  l = 3, T = 14 * 24, # Setting - general
         
     """ MC-based average reward following the target
     """
-    V_MC, std_V_MC = MC_Value(l = l, T = T, time_dependent = time_dependent, mean_reversion = mean_reversion, 
+    V_MC, std_V_MC = MC_Value(l = l, T = T, time_dependent = time_dependent,  
                               u_O = u_O, sd_D = sd_D, sd_R = sd_R, w_A = w_A, w_O = w_O, 
                               target_policy = target_policy, reps = 100, 
                               inner_parallel = inner_parallel)
-    
+    V_behav = np.mean(V_OPE, 0)[-1]
+    print("V_behav:", round(V_behav, 3))
     bias = np.round(np.abs(np.mean(V_OPE, 0) - V_MC), 3)
     std = np.round(np.std(V_OPE, 0), 3)
     mse = np.round(np.sqrt(bias**2 + std**2), 3)
@@ -180,15 +181,15 @@ def simu(pattern_seed = 1,  l = 3, T = 14 * 24, # Setting - general
 
 
 def simu_once(seed = 1, l = 3, T = 14 * 24, time_dependent = False, 
-              target_policy = None, mean_reversion = False, 
+              target_policy = None, 
               sd_D = 3, sd_R = 0, CV_QV = False, 
-              u_O = 12, den_fun = None,
+              u_O = None, den_fun = None,
               dim_S_plus_Ts = 3 + 3, n_cores = n_cores, w_A = 1, w_O = .05, 
               penalty = [1, 1], n_layer = 2, 
               w_hidden = 10, Learning_rate = 1e-4,  
               batch_size = 64, max_iteration = 1001, epsilon = 1e-3, 
               test_num = 0, inner_parallel = False,
-             isValidation = False, on_policy_debug = False): 
+             isValidation = False): 
     npseed(seed)
     N = l ** 2
     def behav(s, a):
@@ -201,20 +202,11 @@ def simu_once(seed = 1, l = 3, T = 14 * 24, time_dependent = False,
         return Ta_disc(np.mean(A_neigh, 0))
     
     # observed data following behav
-    if not on_policy_debug:
-        data, adj_mat, details = DG_once(seed = seed, l = l, T = T, 
-                                         u_O = u_O, 
-                                         time_dependent = time_dependent, mean_reversion = mean_reversion, 
-                                         sd_D = sd_D, sd_R = sd_R, 
-                                         w_A = w_A, w_O = w_O)
-    else:
-        # use either the target policy or its noisy version
-        behav_policy = simu_target_policy_pattern(pattern_seed = seed, l = l, random = True, u_O = u_O, 
-                                                  threshold = 10, noise = True)
-        data, adj_mat, details = DG_once(seed = seed, l = l, T = T, time_dependent = time_dependent, 
-                                         mean_reversion = mean_reversion, u_O = u_O, 
-                                         OPE = True, target_policy = behav_policy, sd_D = sd_D,
-                                        sd_R = sd_R, w_A = w_A, w_O = w_O)
+    data, adj_mat, details = DG_once(seed = seed, l = l, T = T, 
+                                     u_O = u_O, 
+                                     time_dependent = time_dependent,  
+                                     sd_D = sd_D, sd_R = sd_R, 
+                                     w_A = w_A, w_O = w_O)
     
     # OPE
     r = V_DR(data = data, pi = target_policy, behav = behav, adj_mat = adj_mat, dim_S_plus_Ts = dim_S_plus_Ts, n_cores = n_cores, 
@@ -228,13 +220,13 @@ def simu_once(seed = 1, l = 3, T = 14 * 24, time_dependent = False,
 
 """ Apply MC to get the target value
 """
-def MC_Value(l, T, time_dependent, target_policy, mean_reversion = True, u_O = 12, 
+def MC_Value(l, T, time_dependent, target_policy, u_O = None, 
              sd_D =  3, sd_R = 0, reps = 100, inner_parallel = False, w_A = 1, w_O = .01):
     def oneTraj(seed):
         # Off-policy evaluation with target_policy
         data, adj_mat, details = DG_once(seed = seed, l = l, T = T, time_dependent = time_dependent, 
-                                         mean_reversion = mean_reversion, u_O = u_O, 
-                                         OPE = True, target_policy = target_policy, 
+                                          u_O = u_O, 
+                                         TARGET = True, target_policy = target_policy, 
                                          sd_D = sd_D, sd_R = sd_R, w_A = w_A, w_O = w_O)
         R = details[2]
         V = np.mean(R)
@@ -247,3 +239,12 @@ def MC_Value(l, T, time_dependent, target_policy, mean_reversion = True, u_O = 1
     res = np.round([np.mean(Vs), np.std(Vs)], 3)  
     print("MC-based mean and std of average reward:", res)
     return res
+
+#     else:
+#         # use either the target policy or its noisy version
+#         behav_policy = simu_target_policy_pattern(pattern_seed = seed, l = l, random = True, u_O = u_O, 
+#                                                   threshold = 10, noise = True)
+#         data, adj_mat, details = DG_once(seed = seed, l = l, T = T, time_dependent = time_dependent, 
+#                                           u_O = u_O, 
+#                                          TARGET = True, target_policy = behav_policy, sd_D = sd_D,
+#                                         sd_R = sd_R, w_A = w_A, w_O = w_O)
