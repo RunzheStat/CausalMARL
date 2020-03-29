@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 #############################################################################
+simple = False
+# simple = True
+
 #############################################################################
 #%% packages
 # last project
@@ -45,11 +48,19 @@ def adj2neigh(adj_mat):
     return neigh
 
 
-def Ta_disc(ta):
+def Ta_disc(ta, simple = False):
     # regardless of n_neigh
+    if not simple: 
         if ta <= 2/8:
             return 0
         if ta <= 5/8:
+            return 1
+        else:
+            return 2
+    else: # may be do not need discrete
+        if ta <= 1/4:
+            return 0
+        if ta == 2/4:
             return 1
         else:
             return 2
@@ -57,18 +68,17 @@ def Ta_disc(ta):
 def den_b_disc(Ta, N_neigh): 
     # N_neigh is not a constant
     den = 0
-    for i in range(N_neigh):
+    for i in range(N_neigh + 1):
         if Ta_disc(i / N_neigh) == Ta:
             den += binom.pmf(i, N_neigh, 0.5)
     return den
 
 ##########################################################################################################################################################
-def getAdjGrid(l):
+def getAdjGrid(l, simple = False):
     """
     simple: only 4 neigh
     
     """
-    simple = False
     N = l ** 2
     adj_mat = zeros((N, N))
     for i in range(N):

@@ -13,15 +13,15 @@ from _utility import *
         adj_mat: binary adjacent matrix
         [[O, D, M], A, R]
 """
-def DG_once(seed = 1, l = 5, T = 14 * 48, time_dependent = False, w_A = 1, w_O = 1, sd_R  = 1, sd_D = 1, 
-            u_O = None, M_in_R = True, #True,
-           TARGET = False, target_policy = None, T_burn_in = 100, dynamics = "old"):  
+def DG_once(seed = 1, l = 5, T = 14 * 48, time_dependent = False, w_A = 1, w_O = 1, sd_R  = 1, sd_D = 1, sd_O = 1, 
+            u_O = None, M_in_R = False, #True,
+           TARGET = False, target_policy = None, T_burn_in = 100):  
     """ prepare data (fixed)
     """
     T = T + T_burn_in
     npseed(seed)
     N = l ** 2
-    adj_mat = getAdjGrid(l)
+    adj_mat = getAdjGrid(l, simple = simple)
     p_behav = 0.5
     # random errors for D and R
     e_D = (rpoisson(1, (N, T)) - 1) * sd_D
@@ -38,7 +38,7 @@ def DG_once(seed = 1, l = 5, T = 14 * 48, time_dependent = False, w_A = 1, w_O =
     # O: the pattern (spatial distribution) of orders
     #     O = rpoisson(u_O, (T, N)).T    
     ## debug: is the variaance of O too large? learn nothing?
-    O = np.repeat(u_O, T).reshape(N, T) +  (rpoisson(1, (N, T)) - 1) #randn(N,T) #/ 10
+    O = np.repeat(u_O, T).reshape(N, T) +  (rpoisson(sd_O, (N, T)) - sd_O) #randn(N,T) #/ 10
     O[O < 0] = 0
     # Actions
     if TARGET: # target. fixed. 
@@ -47,7 +47,7 @@ def DG_once(seed = 1, l = 5, T = 14 * 48, time_dependent = False, w_A = 1, w_O =
         A = rbin(1, p_behav, (N, T))
     
     # D: initial is the same with driver. then attract by the A and O. burn-in.
-    u_D = np.mean(u_O)
+    u_D = np.mean(u_O) - 2
     D = [arr([u_D for i in range(N)])]
     
     """ MAIN: state trasition and reward calculation [no action selection]
@@ -57,27 +57,15 @@ def DG_once(seed = 1, l = 5, T = 14 * 48, time_dependent = False, w_A = 1, w_O =
         """ Drivers
         """
         ## attractions
-        if dynamics == "old":
-            D_t = diag(1 + w_O * O[:, t - 1]).dot(identity(N) + \
-                                        w_A * diag(A[:, t - 1])).dot(adj_mat).dot(diag( 1 / (O[:, t - 1] * w_O + 1))).dot(D[t - 1])
-            D_t = D_t / n_neigh
+        Attr_OD = w_O * (squeeze(O[:, t - 1]) / (1 + squeeze(D[t - 1])))
+        Attr = np.exp(w_A * A[:, t - 1]) + squeeze(Attr_OD) ## * at first
+        Attr_mat = np.repeat(Attr, N).reshape(N, N)
+        Attr_adj = np.multiply(Attr_mat, adj_mat)
+        Attr_neigh = np.sum(Attr_adj, 0)
 
-            D_t = np.round(arr([a for a in D_t]) + e_D[:, t])
-            D_t[D_t < 0] = 0
-
-            # normalization
-            D_t = D_t * (sum(D[t - 1])/sum(D_t))
-            D.append(D_t)
-        else:
-                
-            Attr_OD = w_O * (squeeze(O[:, t - 1]) / (1 + squeeze(D[t - 1])))
-            Attr = np.exp(w_A * A[:, t - 1]) + squeeze(Attr_OD) ## * at first
-            Attr_mat = np.repeat(Attr, N).reshape(N, N)
-            Attr_adj = np.multiply(Attr_mat, adj_mat)
-            Attr_neigh = np.sum(Attr_adj, 0)
-            
-            D_t = squeeze(Attr_adj.dot((D[t - 1] / squeeze(Attr_neigh)).reshape(-1, 1)))
-            D.append(D_t)
+        D_t = squeeze(Attr_adj.dot((D[t - 1] / squeeze(Attr_neigh)).reshape(-1, 1)))
+        D_t = (D_t + u_D) / 2
+        D.append(D_t)
         O_t = O[:, t] 
         
         """ Tune: M and R 
@@ -139,7 +127,14 @@ def simu_target_policy_pattern(pattern_seed = 1, l = 3, u_O = None, threshold = 
         pi.append(pi_i)
         
     ## Draw plot
-    if print_flag:
+    if print_flag == "all":
+        print("means of Order:", "\n")
+        if u_O is not None:
+            for i in range(l):
+                for j in range(l):
+                    print(round(u_O[i * l + j], 3), end = " ")
+                print("\n")
+    if print_flag in ["all", "policy_only"]:
         print("target policy:", "\n")
         for i in range(l):
             for j in range(l):
@@ -148,13 +143,8 @@ def simu_target_policy_pattern(pattern_seed = 1, l = 3, u_O = None, threshold = 
                 else:
                     print("0", end = " ")
             print("\n")
-        print("means of Order:", "\n")
-        if u_O is not None:
-            for i in range(l):
-                for j in range(l):
-                    print(round(u_O[i * l + j], 3), end = " ")
-                print("\n")
-    return pi
+        print("number of reward locations: ", sum(fixed_policy))
+    return pi#, sum(fixed_policy)
 
 ##########################################################################################################################################################
 

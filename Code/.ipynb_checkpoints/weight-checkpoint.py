@@ -167,9 +167,10 @@ class Density_Ratio_kernel(object):
 
     def train(self, SASR, policy0, policy1, print_flag, 
               batch_size, max_iteration,
-              test_num, 
+              test_num = 0, 
               Ta_i = None, 
-              epsilon = 1e-3, only_state = False, n_neigh = 8, spatial = True):
+              epsilon = 1e-3, only_state = False, 
+              n_neigh = 8, spatial = True, mean_field = True):
         """ Train the NN to get theta^*
         Input:
             policy1(state, action) is its probability
@@ -185,10 +186,20 @@ class Density_Ratio_kernel(object):
             for state, action, next_state, reward in sasr:
                 
                 if spatial: # p_{a|s} needs to consider the neigh (only for our behaviour cases)
-                    pi1 = int(Ta_i == action[1] and policy1(s = None, random_choose = True) == action[0])
-                    PI1.append(pi1) # the target policy is deterministic
-                    pi0 = den_b_disc(action[1], n_neigh) * 0.5
-                    PI0.append(pi0)
+                    Ta_tl = action[1]
+                    A_tl = action[0]
+                    if mean_field:
+                        pi1 = int(Ta_i == Ta_tl and policy1(s = None, random_choose = True) == A_tl)
+                        PI1.append(pi1) # the target policy is deterministic
+                        pi0 = den_b_disc(Ta_tl, n_neigh) * 0.5
+                        PI0.append(pi0)
+                        if pi0 == 0:
+                            print([Ta_tl, n_neigh])
+                    else:
+                        pi1 = int(np.array_equal(Ta_i, Ta_tl) and policy1(s = None, random_choose = True) == A_tl)
+                        PI1.append(pi1) # the target policy is deterministic
+                        pi0 = 0.5**(n_neigh + 1)
+                        PI0.append(pi0)                            
                 else:#                     PI1.append(1)
                     pi1 = int(policy1(s = None, random_choose = True) == action)
                     PI1.append(pi1)

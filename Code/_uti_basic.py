@@ -23,7 +23,7 @@ from numpy.linalg import norm, inv
 from numpy import apply_along_axis as apply
 from sklearn import preprocessing as pre
 
-from termcolor import colored
+from termcolor import colored, cprint
 from matplotlib.pyplot import hist
 
 from sklearn.model_selection import GridSearchCV
@@ -101,6 +101,8 @@ def send_email(message = None, email_address = "13300180059@fudan.edu.cn", title
         server.login(email_address,"w19950722")  #("py.notify.me@gmail.com", "w19950722")
         server.sendmail(sender_email, receiver_email, message)
 
+#############################################################################
+# https://pypi.org/project/termcolor/#description
 def printR(theStr):
     print(colored(theStr, 'red'))
           
