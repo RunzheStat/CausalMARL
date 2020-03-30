@@ -27,9 +27,9 @@ def simu(pattern_seed = 1,  l = 5, T = 14 * 24, thre_range = [9, 10, 11, 12, 13]
     """
 
     npseed(pattern_seed)
-    u_O = rlogN(2.4, sd_u_O, l**2) 
-#     u_O = rlogN(5, sd_u_O, l**2)
-    print("max(u_O) = ", max(u_O))
+#     u_O = rlogN(2.4, sd_u_O, l**2) 
+    u_O = rlogN(4.6, sd_u_O, l**2)
+    print("max(u_O) = ", np.round(max(u_O), 1))
         
     # generate the corresponding target plicy
     target_policys = []
@@ -37,9 +37,9 @@ def simu(pattern_seed = 1,  l = 5, T = 14 * 24, thre_range = [9, 10, 11, 12, 13]
         O_thre = thre_range[i]
         printG("O_threshold = " + str(thre_range[i]))
         if i == 0:#, n_r 
-            target_policy = simu_target_policy_pattern(u_O = u_O, threshold =  O_thre, print_flag = "all")
+            target_policy = simu_target_policy_pattern(l = l, u_O = u_O, threshold =  O_thre, print_flag = "all")
         else:
-            target_policy = simu_target_policy_pattern(u_O = u_O, threshold =  O_thre, print_flag = "policy_only")
+            target_policy = simu_target_policy_pattern(l = l, u_O = u_O, threshold =  O_thre, print_flag = "policy_only")
         target_policys.append(target_policy)
         
     # generate the adj for the grid
@@ -70,34 +70,40 @@ def simu(pattern_seed = 1,  l = 5, T = 14 * 24, thre_range = [9, 10, 11, 12, 13]
     good_setting_flag = 0
     print(Dash)
     for i in range(len(target_policys)):
-        printG("O_threshold = " + str(thre_range[i]))
         target_policy = target_policys[i]
         V_MC, std_V_MC = MC_Value(l = l, T = T, time_dependent = time_dependent,  
                                   u_O = u_O, sd_D = sd_D, sd_R = sd_R, sd_O = sd_O, w_A = w_A, w_O = w_O, 
                                   target_policy = target_policy, reps = 100, 
                                   inner_parallel = inner_parallel)
         V_OPE = value_targets[i]
+        
         if i == 0:
             V_behav = np.mean(V_OPE, 0)[-1]
-            printG("Value of Behaviour policy:" + str(round(V_behav, 3)))
+            printR("Value of Behaviour policy:" + str(round(V_behav, 3)))
+            
+        printG("O_threshold = " + str(thre_range[i]))
+        printR("MC for this TARGET:" + str([V_MC, std_V_MC]))
+        
+        
+        
         
         """ Value estimation
         """
-        bias = np.round(np.abs(np.mean(V_OPE, 0) - V_MC), 2)
-    #     bias = np.round(np.mean(V_OPE, 0) - V_MC, 2)
+#         bias = np.round(np.abs(np.mean(V_OPE, 0) - V_MC), 2)
+        bias = np.round(np.mean(V_OPE, 0) - V_MC, 2)
         std = np.round(np.std(V_OPE, 0), 2)
         mse = np.round(np.sqrt(bias**2 + std**2), 2)
         mse_rel = np.round(mse - mse[0], 2)
         bias = list(bias); std = list(std); mse = list(mse); mse_rel = list(mse_rel) 
-        res = "   [DR/QV/IS]; [DR/QV/IS]_NO_MARL; [DR/QV/IS]_NO_MF; [DR2, V_behav]" + "\n" + "bias:" + str([bias[:3]]) + str([bias[3:6]]) + str([bias[6:9]]) + str([bias[9:]]) + "\n" + "std:" + str([std[:3]]) + str([std[3:6]]) + str([std[6:9]]) + str([std[9:]]) + "\n" + \
-                "MSE:" + str([mse[:3]]) + str([mse[3:6]]) + str([mse[6:9]]) + str([mse[9:]])
+        res = "   [DR/QV/IS]; [DR/QV/IS]_NO_MARL; [DR/QV/IS]_NO_MF; [DR2, V_behav]" + "\n" + "bias:" + str([bias[:3]]) + str([bias[3:6]]) + str([bias[6:9]]) + str([bias[9:]]) + "\n" + "std:" + str([std[:3]]) + str([std[3:6]]) + str([std[6:9]]) + str([std[9:]])
         print(res)
-        printB("MSE(-DR):" + str([mse_rel[:3]]) + str([mse_rel[3:6]]) + str([mse_rel[6:9]]) + str([mse_rel[9:]]))# + "\n"
+        printB("MSE:" + str([mse[:3]]) + str([mse[3:6]]) + str([mse[6:9]]) + str([mse[9:]]))
+        printB("MSE(-DR):" + str([mse_rel[:3]]) + str([mse_rel[3:6]]) + str([mse_rel[6:9]]) + str([mse_rel[9:]])) # + "\n"
         if file is not None:        
             print(res + "\n" + "MSE(-DR):" + str([mse_rel[:3]]) + str([mse_rel[3:6]]) + str([mse_rel[6:9]]) + str([mse_rel[9:]]) + "\n", file = file)
 
         if mse_rel[0] <= np.min(mse_rel[2:4]):
-            cprint("***** BETTER THAN [QV, IS, DR_NO_MARL] *****", 'white', 'on_red')
+            cprint("******", 'white', 'on_red')
             print("*****BETTER THAN [QV, IS, DR_NO_MARL]*****", file = file)
             good_setting_flag += 1
         elif mse_rel[0] <= np.min(mse_rel[3:6]):  
@@ -113,29 +119,29 @@ def simu(pattern_seed = 1,  l = 5, T = 14 * 24, thre_range = [9, 10, 11, 12, 13]
         else:  # 【bias, variance, MSE】 for 【\hat{V_target} - \hat{V}_0】
             ATE = arr(V_OPE) - V_0
             MC_ATE = V_MC - MC_0
-            printG("MC-based ATE = " + str(round(MC_ATE, 2)))
+            printR("MC-based ATE = " + str(round(MC_ATE, 2)))
             
-            bias = np.round(np.abs(np.mean(ATE, 0) - MC_ATE), 2)
+#             bias = np.round(np.abs(np.mean(ATE, 0) - MC_ATE), 2)
+            bias = np.round(np.mean(ATE, 0) - MC_ATE, 2)
             std = np.round(np.std(ATE, 0), 2)
             mse = np.round(np.sqrt(bias**2 + std**2), 2)
             mse_rel = np.round(mse - mse[0], 2)
             bias = list(bias); std = list(std); mse = list(mse); mse_rel = list(mse_rel) 
-            res = "   [DR/QV/IS]; [DR/QV/IS]_NO_MARL; [DR2]" + "\n" + "bias:" + str([bias[:3]]) + str([bias[3:6]]) + str([bias[6:9]]) + str([bias[9]]) + "\n" + "std:" + str([std[:3]]) + str([std[3:6]]) + str([std[6:9]]) + str([std[9]]) + "\n" + \
-                    "MSE:" + str([mse[:3]]) + str([mse[3:6]]) + str([mse[6:9]]) + str([mse[9]])
+            res = "   [DR/QV/IS]; [DR/QV/IS]_NO_MARL; [DR2]" + "\n" + "bias:" + str([bias[:3]]) + str([bias[3:6]]) + str([bias[6:9]]) + str([bias[9]]) + "\n" + "std:" + str([std[:3]]) + str([std[3:6]]) + str([std[6:9]]) + str([std[9]])
             print(res)
+            printB("MSE:" + str([mse[:3]]) + str([mse[3:6]]) + str([mse[6:9]]) + str([mse[9]])) 
             printB("MSE(-DR):" + str([mse_rel[:3]]) + str([mse_rel[3:6]]) + str([mse_rel[6:9]]) + str([mse_rel[9]])) #  + "\n"
             if file is not None:        
                 print(res + "\n" + "MSE(-DR):" + str([mse_rel[:3]]) + str([mse_rel[3:6]]) + str([mse_rel[6:9]]) + str([mse_rel[9]]) + "\n", file = file)
 
             if mse_rel[0] <= np.min(mse_rel[2:4]):
-                cprint("***** BETTER THAN [IS, DR_NO_MARL] *****", 'white', 'on_red')
+                cprint("******", 'white', 'on_red')
                 print(" ***** BETTER THAN [IS, DR_NO_MARL] *****", file = file)
                 good_setting_flag += 1
             elif mse_rel[0] <= np.min(mse_rel[3:6]):     
                 cprint("better than DR_NO_MARL", "yellow")
                 print("better than [DR_NO_MARL]", file = file) 
-#         print("--------------------- \n")
-        cprint('==============',  attrs = ["bold"])
+        cprint('==============',  attrs = ["bold"]); print("\n")
     if good_setting_flag == int(len(target_policys) * 2):
         printR("******************** THIS SETTING IS GOOD ********************")
     return None#[V_OPE, V_MC, std_V_MC]
@@ -207,5 +213,4 @@ def MC_Value(l, T, time_dependent, target_policy, u_O = None,
         Vs = rep_seeds(oneTraj, reps)
     # std among reps is small
     res = np.round([np.mean(Vs), np.std(Vs)], 3)  
-    printG("MC-based mean and std of average reward:" + str(res))
     return res

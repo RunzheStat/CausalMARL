@@ -8,7 +8,6 @@ The majority is adapted from the source code of the paper "Breaking the Curse of
 import numpy as np
 from _uti_basic import *
 from _utility import *
-
 import tensorflow as tf
 from time import sleep
 import sys
@@ -177,6 +176,7 @@ class Density_Ratio_kernel(object):
             
         """
         ########################### Preparing data ###########################
+        npseed(0)
         S = []
         SN = []
         PI1 = []
@@ -240,7 +240,7 @@ class Density_Ratio_kernel(object):
             PI0_test = np.array(PI0[:test_num])
             
         #################################################################################
-
+        
         ## Get the med_dist for hyperparameter in RKHS
         subsamples = np.random.choice(N, 1000)
         s = S[subsamples]

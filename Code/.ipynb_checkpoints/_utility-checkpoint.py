@@ -3,10 +3,11 @@
 #############################################################################
 simple = False
 # simple = True
-
+M_in_R = True
+u_O_u_D = 10
+mean_reversion = False
 #############################################################################
 #%% packages
-# last project
 from _uti_basic import *
 from scipy.linalg import sqrtm
 from sklearn.preprocessing import StandardScaler

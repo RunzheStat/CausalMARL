@@ -14,7 +14,8 @@ from _utility import *
         [[O, D, M], A, R]
 """
 def DG_once(seed = 1, l = 5, T = 14 * 48, time_dependent = False, w_A = 1, w_O = 1, sd_R  = 1, sd_D = 1, sd_O = 1, 
-            u_O = None, M_in_R = False, #True,
+            u_O = None, M_in_R = M_in_R, #True,
+            mean_reversion = mean_reversion, u_O_u_D = u_O_u_D, 
            TARGET = False, target_policy = None, T_burn_in = 100):  
     """ prepare data (fixed)
     """
@@ -34,12 +35,13 @@ def DG_once(seed = 1, l = 5, T = 14 * 48, time_dependent = False, w_A = 1, w_O =
     """
     # weight in the definition of mismatch
 
-    w_M = 0.5     # 0.8
+    w_M = 0.5    # 0.8
+
     # O: the pattern (spatial distribution) of orders
-    #     O = rpoisson(u_O, (T, N)).T    
-    ## debug: is the variaance of O too large? learn nothing?
-    O = np.repeat(u_O, T).reshape(N, T) +  (rpoisson(sd_O, (N, T)) - sd_O) #randn(N,T) #/ 10
-    O[O < 0] = 0
+    O = rpoisson(u_O, (T, N)).T    
+#     O = np.repeat(u_O, T).reshape(N, T) +  (rpoisson(sd_O, (N, T)) - sd_O) #randn(N,T) #/ 10
+#     O[O < 0] = 0
+    
     # Actions
     if TARGET: # target. fixed. 
         A = arr([[target_policy[i](None, random_choose = True) for j in range(T)] for i in range(N)])
@@ -47,7 +49,7 @@ def DG_once(seed = 1, l = 5, T = 14 * 48, time_dependent = False, w_A = 1, w_O =
         A = rbin(1, p_behav, (N, T))
     
     # D: initial is the same with driver. then attract by the A and O. burn-in.
-    u_D = np.mean(u_O) - 2
+    u_D = np.mean(u_O) - u_O_u_D
     D = [arr([u_D for i in range(N)])]
     
     """ MAIN: state trasition and reward calculation [no action selection]
@@ -64,7 +66,8 @@ def DG_once(seed = 1, l = 5, T = 14 * 48, time_dependent = False, w_A = 1, w_O =
         Attr_neigh = np.sum(Attr_adj, 0)
 
         D_t = squeeze(Attr_adj.dot((D[t - 1] / squeeze(Attr_neigh)).reshape(-1, 1)))
-        D_t = (D_t + u_D) / 2
+        if mean_reversion:
+            D_t = (D_t + u_D) / 2
         D.append(D_t)
         O_t = O[:, t] 
         
@@ -101,18 +104,18 @@ def DG_once(seed = 1, l = 5, T = 14 * 48, time_dependent = False, w_A = 1, w_O =
 
 """ generate the target policy (fixed reward regions) randomly / based on u_O
 """
-def simu_target_policy_pattern(pattern_seed = 1, l = 3, u_O = None, threshold = 12, print_flag = True, noise = False):
+def simu_target_policy_pattern(l = 3, u_O = None, threshold = 12, print_flag = True, noise_ratio = None):
     
-    if u_O is not None: # generate target based on the order
+    if threshold >=0: # generate target based on the order
         N = len(u_O)
         l = int(sqrt(N))
         fixed_policy = [int(u_O[i] > threshold) for i in range(N)]
     else: # randomly  generate the target policy
-        npseed(pattern_seed)
+        npseed(abs(threshold))
         N = l**2
-        fixed_policy = rbin(1, 0.5, N)
-    if noise:
-        e = np.random.choice(N, int(N//5), replace = False)
+        fixed_policy = list(rbin(1, 0.5, N))
+    if noise_ratio is not None:
+        e = np.random.choice(N, int(N * noise_ratio), replace = False)
         fixed_policy -= e
         fixed_policy = abs(fixed_policy)
     
@@ -132,7 +135,7 @@ def simu_target_policy_pattern(pattern_seed = 1, l = 3, u_O = None, threshold = 
         if u_O is not None:
             for i in range(l):
                 for j in range(l):
-                    print(round(u_O[i * l + j], 3), end = " ")
+                    print(round(u_O[i * l + j], 1), end = " ")
                 print("\n")
     if print_flag in ["all", "policy_only"]:
         print("target policy:", "\n")
@@ -162,31 +165,3 @@ def simu_target_policy_pattern(pattern_seed = 1, l = 3, u_O = None, threshold = 
 #                 else:
 #                     D_t = (D_t + u_O) // 2 
 #             D_t = np.round(arr([a for a in D_t]) + e_D[:, t])
-
-
-# more spatial component (spatial reward); not exactly same with Chengchun's
-# new reward definitions
-#     neigh = adj2neigh(adj_mat)
-#     R_spatial_more = []
-#     for i in range(N):
-#         R_neigh = []
-#         for j in neigh[i]:
-#             R_neigh.append(R[j,:])
-#         R_spatial_more.append(R[i,:] + np.mean(R_neigh, 0))
-#     R = arr(R_spatial_more)
-
-
-# is_homogenous = isinstance(u_O, int)
-#     if is_homogenous: # u_O is a number
-#         if time_dependent:
-#             mean_OD = [10 * (2 - sin(t/48*2*np.pi)) for t in range(T)]
-#             O = rpoisson(mean_OD, (N, T))
-#         else: # generate orders from poission distribution with E(O) = u_O
-#             O = rpoisson(u_O, (N, T))  
-#     else: # list, heterogenous 
-        
-# else:
-#     """ fixed number: half as reward
-#     """
-#     reward_place = np.random.choice(N, N//2, replace = False)
-#     fixed_policy = [int(b in reward_place) for b in range(N)]
