@@ -1,0 +1,485 @@
+\documentclass{article}
+
+% if you need to pass options to natbib, use, e.g.:
+%     \PassOptionsToPackage{numbers, compress}{natbib}
+% before loading neurips_2020
+
+% ready for submission
+% \usepackage{neurips_2020}
+
+% to compile a preprint version, e.g., for submission to arXiv, add add the
+% [preprint] option:
+%     \usepackage[preprint]{neurips_2020}
+
+% to compile a camera-ready version, add the [final] option, e.g.:
+%     \usepackage[final]{neurips_2020}
+
+% to avoid loading the natbib package, add option nonatbib:
+\usepackage{neurips2020}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage[utf8]{inputenc} % allow utf-8 input
+\usepackage[T1]{fontenc}    % use 8-bit T1 fonts
+\usepackage{hyperref}       % hyperlinks
+\usepackage{url}            % simple URL typesetting
+\usepackage{booktabs}       % professional-quality tables
+\usepackage{amsfonts}       % blackboard math symbols
+\usepackage{nicefrac}       % compact symbols for 1/2, etc.
+\usepackage{microtype}      % microtypography
+\usepackage{algorithm,algpseudocode,enumerate}
+\usepackage{bm}
+\usepackage{xr}
+\externaldocument{causalMARL}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\newtheorem{lemma}{Lemma}[section]
+\newcommand{\Mean}{{\mathbb{E}}}
+\newcommand{\Var}{{\mbox{Var}}}
+\newcommand{\Cov}{{\mbox{cov}}}
+\newcommand{\Corr}{{\mbox{corr}}}
+\newcommand{\diag}{{\mbox{diag}}}
+\newcommand{\prob}{{\mathbb{P}}}
+\newcommand\independent{\protect\mathpalette{\protect\independenT}{\perp}}
+\def\independenT#1#2{\mathrel{\rlap{$#1#2$}\mkern2mu{#1#2}}}
+\def\floor#1{\lfloor #1 \rfloor}
+\title{Supplement to ``Spatiotemporal Causal Effects Evaluation: A Multi-Agent Reinforcement Learning Framework"}
+
+% The \author macro works with any number of authors. There are two commands
+% used to separate the names and addresses of multiple authors: \And and \AND.
+%
+% Using \And between authors leaves it to LaTeX to determine where to break the
+% lines. Using \AND forces a line break at that point. So, if LaTeX puts 3 of 4
+% authors names on the first line, and the last on the second line, try using
+% \AND instead of \And before the third author name.
+
+\author{%
+	David S.~Hippocampus\thanks{Use footnote for providing further information
+		about author (webpage, alternative address)---\emph{not} for acknowledging
+		funding agencies.} \\
+	Department of Computer Science\\
+	Cranberry-Lemon University\\
+	Pittsburgh, PA 15213 \\
+	\texttt{hippo@cs.cranberry-lemon.edu} \\
+	% examples of more authors
+	% \And
+	% Coauthor \\
+	% Affiliation \\
+	% Address \\
+	% \texttt{email} \\
+	% \AND
+	% Coauthor \\
+	% Affiliation \\
+	% Address \\
+	% \texttt{email} \\
+	% \And
+	% Coauthor \\
+	% Affiliation \\
+	% Address \\
+	% \texttt{email} \\
+	% \And
+	% Coauthor \\
+	% Affiliation \\
+	% Address \\
+	% \texttt{email} \\
+}
+
+\begin{document}
+	
+\maketitle
+
+\appendix 
+\section{More on the learning procedure}
+\subsection{Estimation of the weight}\label{sec:weight}
+Consider the following optimization problem
+\begin{eqnarray}\label{optimize}
+	\widehat{\omega}_i=\argmin_{\omega_i\in \Omega} \sup_{f\in \mathcal{F}} \left|\sum_{t=0}^{T-1} \Delta_{i,t}(\omega_i) f(S_{0,t+1},S_{i,t+1},\widetilde{S}_{i,t+1})\right|^2.
+\end{eqnarray}
+In our implementation, we set $\mathcal{F}$ to a unit ball of a reproducing kernel Hilbert space (RFHS), i.e., 
+\begin{eqnarray*}
+	\mathcal{F}=\{f\in \mathcal{H}:\|f\|_{\mathcal{H}}=1\},
+\end{eqnarray*}
+where %$\mathcal{H}$ corresponds to an RFHS such that
+\begin{eqnarray*}
+	\mathcal{H}=\left\{f(\cdot)=\sum_{t=0}^{T-1} b_t \kappa(S_{0,t+1},S_{i,t+1},\widetilde{S}_{i,t+1};\cdot): \{b_t\}_{t=0}^{T-1}\in \mathbb{R}^{T} \right\},
+\end{eqnarray*}
+for some positive definite kernel $\kappa(\cdot;\cdot)$. Similar to Theorem 2 of \cite{liu2018}, the optimization problem in \eqref{optimize} is then reduced to 
+\begin{eqnarray*}
+	\widehat{\omega}_i=\argmin_{\omega_i\in \Omega} \sum_{t_1=0}^{T-1} \sum_{t_2=0}^{T-1} \Delta_{i,t_1}(\omega_i)\Delta_{i,t_2}(\omega_i) \kappa(S_{0,t_1+1},S_{i,t_1+1},\widetilde{S}_{i,t_1+1};S_{0,t_2+1},S_{i,t_2+1},\widetilde{S}_{i,t_2+1}). 
+\end{eqnarray*}
+We set $\Omega$ to the class of neural networks. One could use different parameters to factorize different $\omega_i$ such that each $\widehat{\omega}_i$ is computed separately. Alternatively, one could allow different $\omega_i$ to share some common parameters. We detail our procedure in Algorithm \ref{alg1}. 
+
+\begin{algorithm}[t!]
+	\caption{Estimation of the weight.}
+	\label{alg1}
+	%\vspace*{-15pt}
+	\begin{algorithmic}
+		\item
+		\begin{description}
+			\item[\textbf{Input}:] The data $\{(S_{0,j},S_{i,j},A_{i,j},R_{i,j},S_{0,j+1},S_{i,j+1}):1\le i\le N,0\le j< T\}$. A target policy $\bm{\pi}$. 
+			
+			\item[\textbf{Initial}:] Initial the density ratio $\omega_i=\omega_{i,\theta}$ for $1\le i\le N$, to be neural networks parameterized by $\theta$.
+			
+			\item[\textbf{for}] iteration $=1,2,\cdots$ \textbf{do}
+			\begin{enumerate}
+				\item[a] Randomly sample a batch $\mathcal{M}$ from $\{0,1,\cdots,T-1\}$.
+				
+				\item[b] {\textbf{Update}} the parameter $\theta$ by $\theta\leftarrow \theta-\epsilon N^{-1}\sum_{i=1}^N \nabla_{\theta} D_i(\omega_{i,\theta}/z_{\omega_{i,\theta}})$ where $D_i(\omega_{i,\theta})$ is equal to
+				\begin{eqnarray*}
+					\frac{1}{|\mathcal{M}|}\sum_{t_1,t_2\in \mathcal{M}}  \Delta_{i,t_1}(\omega_{i,\theta})\Delta_{i,t_2}(\omega_{i,\theta}) \kappa(S_{0,t_1+1},S_{i,t_1+1},\widetilde{S}_{i,t_1+1};S_{0,t_2+1},S_{i,t_2+1},\widetilde{S}_{i,t_2+1}),
+				\end{eqnarray*}
+				and $z_{\omega_{i,\theta}}$ is a normalization constant $z_{\omega_{i,\theta}}=|\mathcal{M}|^{-1} \sum_{t\in \mathcal{M}} \omega_{i,\theta}(S_{0,t+1},S_{i,t+1},\widetilde{S}_{i,t+1})$. 
+			\end{enumerate}
+			\item[\textbf{Output}] $\omega_{i,\theta}$ for $1\le i\le N$. 
+		\end{description}
+	\end{algorithmic}
+\end{algorithm}
+
+\subsection{Estimation of the Q-function and the value}\label{sec:Q}
+We now describe methods to estimate $Q_i$ and $V_i(\bm{\pi})$. For two given function classes $\mathcal{G}$ and $\mathcal{Q}$, define the following penalized estimator
+\begin{eqnarray*}
+	\widehat{g}_{i}(\cdot,\cdot,\cdot,\cdot,\cdot;\eta,Q_i)=\argmin_{g\in \mathcal{G}}\frac{1}{T}\sum_{t=0}^{T-1} \{R_{i,t}+Q_{i}(\pi_i,\widetilde{A}_i(\bm{\pi}),S_{0,t+1},S_{i,t+1},\widetilde{S}_{i,t+1})\\
+	-\eta-Q_i(A_{i,t},\widetilde{A}_{i,t},S_{0,t},S_{i,t},\widetilde{S}_{i,t})-g(A_{i,t},\widetilde{A}_{i,t},S_{0,t},S_{i,t},\widetilde{S}_{i,t})\}^2+\mu J_2^2(g),\\
+	(\widehat{V}_i(\bm{\pi}),\widehat{Q}_i)=\argmin_{(\eta,Q_i)\in \mathbb{R}\times \mathcal{Q}}\frac{1}{T}\sum_{t=0}^{T-1} \widehat{g}_{i}^2(A_{i,t},\widetilde{A}_{i,t},S_{0,t},S_{i,t},\widetilde{S}_{i,t};\eta,Q_i)+\lambda J_1^2(Q_i),
+\end{eqnarray*}
+where $J_1$ and $J_2$ denote some penalty functions, $\mu$ and $\lambda$ stand for some tuning parameters. Next we derive the close-form expressions of 	$(\widehat{V}_i(\bm{\pi}),\widehat{Q}_i)$ when RKHS is used to model $Q_i$ and $g_i$. %The derivation is based on the results in the paper Farahmand et al. (2016). 
+
+Define vectors $Z_{i,t}=(A_{i,t},\widetilde{A}_{i,t},S_{0,t},S_{i,t},\widetilde{S}_{i,t})^\top$ and $Z_{i,t}^*=(\pi_i,\widetilde{A}_i(\bm{\pi}),S_{0,t+1},S_{i,t+1},\widetilde{S}_{i,t+1})^\top$. Let $K_g$ and $K_Q$ denote the reproducing kernels used to model $g$ and $Q$, respectively. In practice, we can use gaussian RBF kernels to model these two functions. For a given $Q_i$ and $\eta$, the optimizer of $\widehat{g}_i$ can be represented by $\sum_{t=0}^{T-1} \widehat{\beta}_{i,t} K_g(Z_{i,t},\cdot)$. As such, we obtain
+\begin{eqnarray*}
+	\widehat{\bm{\beta}}_i=\argmin_{\bm{\beta}} \frac{1}{T}\sum_{t=0}^{T-1} \left\{R_{i,t}+Q_i(Z_{i,t}^*)-\eta-Q_i(Z_{i,t})-\sum_{j=0}^{T-1} \beta_{j} K_g(Z_{i,j},Z_{i,t}) \right\}^2+\mu \bm{\beta}^\top \bm{K}_g \bm{\beta}\\
+	=\frac{1}{T} \bm{\beta}^\top \{\bm{K}_g\bm{K}_g^\top+T\mu \bm{K}_g\} \bm{\beta}-\frac{2}{T}\bm{\beta}^\top \bm{K}_g (\bm{R}+\bm{Q}_i^{*}-\bm{Q}_i-\eta \bm{1})
+	+\hbox{some~terms~that~are~independent~of~}\bm{\beta},
+\end{eqnarray*}
+where $\bm{K}_g=\{K_g(Z_{i,j_1},Z_{i,j_2})\}_{j_1,j_2}$ and $\bm{R}$, $\bm{Q}_i^{*}$ and $\bm{Q}_i$ the column vectors formed by elements in $R_t$, $Q_i(Z_{i,t}^*)$ and $Q_i(Z_{i,t})$, respectively. Notice that $\bm{K}_g$ is symmetric, by some calculations, we obtain
+\begin{eqnarray*}
+	\widehat{\bm{\beta}}_i=(\bm{K}_g\bm{K}_g^\top+T\mu \bm{K}_g)^{-1} \bm{K}_g (\bm{R}+\bm{Q}_i^{*}-\bm{Q}_i-\eta \bm{1})
+	=(\bm{K}_g+T\mu\bm{I})^{-1} (\bm{R}+\bm{Q}_i^{*}-\bm{Q}_i-\eta \bm{1}).
+\end{eqnarray*}
+As a result, for a given $Q_i$ and $\eta$, we have
+\begin{eqnarray*}
+	\widehat{g}_i(Z_{i,t};\eta,Q_i)=\widehat{\bm{\beta}}_i^\top \bm{K}_g \bm{e}_t,
+\end{eqnarray*}
+where $\bm{e}_t$ denotes the column vector with the $t$-th element equals to one and other elements equal to zero. As such,
+\begin{eqnarray*}
+	\frac{1}{T}\sum_{t=0}^{T-1} \widehat{g}_{i}^2(A_{i,t},\widetilde{A}_{i,t},S_{0,t},S_{i,t},\widetilde{S}_{i,t};\eta,Q_i)=\frac{1}{T}\widehat{\bm{\beta}}_i^\top \bm{K}_g \bm{K}_g^T \widehat{\bm{\beta}}_i.
+\end{eqnarray*}
+Similarly, we can represent $Q_i$ as $\sum_{t=0}^{2T-1} \widehat{\alpha}_{i,t} K_Q(\widetilde{Z}_{i,t},\cdot)$ where $\widetilde{Z}_{i,t}$ denotes the $t$-th element in the vector $(Z_{i,0}^\top,Z_{i,1}^\top,\cdots,Z_{i,T-1}^\top,Z_{i,0}^{*\top},\cdots,Z_{i,T-1}^{*\top})^\top$. Let $\bm{K}_Q$ denotes the corresponding $2T\times 2T$ matrix, we have
+\begin{eqnarray*}
+	Q_i(Z_{i,t})=\bm{\alpha}_i^\top \bm{K}_Q \bm{e}_t\,\,\,\,\hbox{and}\,\,\,\,Q_i(Z_{i,t}^*)=\widehat{\bm{\alpha}}_i^\top \bm{K}_Q \bm{e}_{t+T+1}.
+\end{eqnarray*}
+It follow that
+\begin{eqnarray*}
+	\bm{Q}_i^*-\bm{Q}_i=\underbrace{[-\bm{I}_{T}, \bm{I}_{T}]}_{\bm{C}}\bm{K}_Q \widehat{\bm{\alpha}}_i.
+\end{eqnarray*}
+Note that $\bm{K}_Q$ is symmetric. Let $\bm{E}=\bm{K}_g^\top (\bm{K}_g+T\mu \bm{I})^{-1}$, $\widehat{\bm{\alpha}}_i$ corresponds to the solution of the following optimization problem, 
+\begin{eqnarray*}
+	\widehat{\bm{\alpha}}_i=\argmin_{\bm{\alpha}} (\bm{R}+\bm{C} \bm{K}_Q \bm{\alpha}-\eta \bm{1})^\top \bm{E}^\top \bm{E} (\bm{R}+\bm{C} \bm{K}_Q \bm{\alpha}-\eta \bm{1})+T \lambda \bm{\alpha}^\top \bm{K}_Q \bm{\alpha}.
+\end{eqnarray*}
+Taking derivatives with respect to $\bm{\alpha}$ and $\eta$, we obtain
+\begin{eqnarray*}
+	(\widehat{\bm{\alpha}}_i,\widehat{V}_i(\bm{\pi}))^\top=-([\bm{C} \bm{K}_Q,-\bm{1}]^\top \bm{E}^\top \bm{E}[\bm{C} \bm{K}_Q,-\bm{1}]+[T\lambda \bm{K}_Q,\bm{0};\bm{0}^\top,0])^{-1}[\bm{C} \bm{K}_Q,-\bm{1}] \bm{E}^\top \bm{E} \bm{R}.
+\end{eqnarray*}
+
+\subsection{Estimation of the treatment assignment probability}\label{sec:propensity}
+Note that $b_i(\bm{\pi}|S_{0,t},S_{i,t},\widetilde{S}_{i,t})=\Mean \{\mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi}))|S_{0,t},S_{i,t},\widetilde{S}_{i,t}\}$. It can thus be learned by applying machine learning algorithms to datasets with responses $\{ \mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi})):0\le t< T \}$ and predictors $\{(S_{0,t},S_{i,t},\widetilde{S}_{i,t}):0\le t<T\}$. 
+
+\section{Additional technical conditions and lemmas}\label{sec:addtechcond}
+\subsection{Technical conditions}
+Let $Q_{i,\bm{\pi}}^*$ denote the function such that $Q_{i,\bm{\pi}}^*(S_{0,t},S_{i,t},\widetilde{S}_{i,t})=Q_i^*(\pi_i,\widetilde{A}_i(\bm{\pi}), S_{0,t},S_{i,t},\widetilde{S}_{i,t})$ almost surely for any $t$ and $i$. Similarly, let $\widehat{Q}_{i,\bm{\pi}}$ denote the function such that $\widehat{Q}_{i,\bm{\pi}}(S_{0,t},S_{i,t},\widetilde{S}_{i,t})=\widehat{Q}_i(\pi_i,\widetilde{A}_i(\bm{\pi}), S_{0,t},S_{i,t},\widetilde{S}_{i,t})$ almost surely for any $t$ and $i$.
+
+(A5)(i) $\sum_{i=1}^N |V_i^*(\bm{\pi})-\widehat{V}_i(\bm{\pi})|/N=o_p(1)$; (ii) $\widehat{Q}_{i,\bm{\pi}}\in \mathcal{Q}$, $\widehat{\omega}_i\in \mathcal{W}$ almost surely for any $i$. $\mathcal{Q}$ and $\mathcal{W}$ satisfy $\sup_Q N(\mathcal{Q}, e_Q, \varepsilon \|F\|_{Q,2})\le (A/\varepsilon)^{\nu}$, $\sup_Q N(\mathcal{W}, e_Q, \varepsilon \|F\|_{Q,2})\le (A/\varepsilon)^{\nu}$ for some $e\le A=O(1)$, $\nu=O(NT)$, and their envelope functions are bounded by some constant $M$. (iii) $\max_i |\widehat{Q}_{i,\bm{\pi}}(s_0,s_i,\widetilde{s}_{i})-Q_{i,\bm{\pi}}^*(s_0,s_i,\widetilde{s}_{i})|^2p(b,s_0,s_i,\tilde{s}_i)ds_0ds_id\tilde{s}_i=o_p(1)$, $\max_i |\widehat{\omega}_i(s_0,s_i,\widetilde{s}_{i})-\omega_{i}^*(s_0,s_i,\widetilde{s}_{i})|^2p(b,s_0,s_i,\tilde{s}_i)ds_0ds_id\tilde{s}_i=o_p(1)$.
+
+(A6)(i) $\max_i |V_i^*(\bm{\pi})-\widehat{V}_i(\bm{\pi})|^2=o_p((NT)^{-1/2} )$; (ii) $\max_i |\widehat{Q}_{i,\bm{\pi}}(s_0,s_i,\widetilde{s}_{i})-Q_{i,\bm{\pi}}^*(s_0,s_i,\widetilde{s}_{i})|^2p(b,s_0,s_i,\tilde{s}_i)ds_0ds_id\tilde{s}_i=o_p((NT)^{-1/2})$; (iii) $\max_i |\widehat{\omega}_i(s_0,s_i,\widetilde{s}_{i})-\omega_{i}^*(s_0,s_i,\widetilde{s}_{i})|^2p(b,s_0,s_i,\tilde{s}_i)ds_0ds_id\tilde{s}_i=o_p((NT)^{-1/2})$; (iv) $T\gg N\nu^2 \log^4 (NT)$.
+  
+\subsection{An auxiliary lemma}
+We briefly introduce our setup before presenting the lemma.
+Let $\{Z_t:t\ge 0\}$ be a stationary $\beta$-mixing process whose $\beta$-mixing coefficients are given by $\{\beta(q):q\ge 0\}$. %satisfy $\beta(q)\le \kappa_0 \rho^q$ for some $\kappa_0>0$, $0<\rho<1$. For 
+Let $\mathcal{F}$ be a pointwise measurable class of functions that take $Z_t$ as input with a measurable envelope function $F$. For any $f\in \mathcal{F}$, suppose $\Mean f(Z_0)=0$. Let $\sigma^2>0$ be a positive constant such that $\sup_{f\in \mathcal{F}} \Mean f^2(Z_0)\le \sigma^2 \le \Mean F^2(Z_0)$. In the following, we focus providing an exponential inequality for the empirical process $\sup_{f\in \mathcal{F}}|\sum_{t=0}^{T-1} f(Z_t)|$. 
+
+\begin{lemma}\label{lemma:EP}
+	%Suppose the $\beta$-mixing coefficients of $\{Z_t:t\ge 0\}$ $\{\beta(q):q\ge 0\}$ satisfy $\beta(q)\le \kappa_0 \rho^q$ for some $\kappa_0>0$, $0<\rho<1$. 
+	Suppose the envelop function is uniformly bounded by some constant $M>0$. In addition, suppose $\mathcal{F}$ belongs to the class of VC-type class such that $\sup_Q N(\mathcal{F}, e_Q, \varepsilon \|F\|_{Q,2})\le (A/\varepsilon)^{\nu}$ \citep[see Definition 2.1 in][for details]{cherno2014} for some $A\ge e,\nu\ge 1$. Then there exist some constants $c,C>0$ such that
+	\begin{eqnarray*}
+		\prob\left(\sup_{f\in \mathcal{F}}\left|\sum_{t=0}^{T-1} f(Z_t)\right|>c\sqrt{\nu q\sigma^2T \log \left(\frac{AM}{\sigma}\right)}+c\nu M \log \left(\frac{AM}{\sigma}\right)+c q\tau+Mq\right)\\
+		\le Cq\exp\left(-\frac{\tau^2q}{CT\sigma^2}\right)+Cq\exp\left(-\frac{\tau}{CM}\right)+\frac{T\beta(q)}{q},
+	\end{eqnarray*}
+	for any $\tau>0$, $1\le q<T/2$. 
+\end{lemma}
+
+\section{Proofs}
+We use $c$ and $C$ to denote some generic constants whose values are allowed to vary from place to place. For any two positive sequences $\{a_t\}_{t\ge 1}$ and $\{b_t\}_{t\ge 1}$, we write $a_t\preceq b_t$ if there exists some constant $C>0$ such that $a_t\le Cb_t$ for any $t$. The notation $a_t\preceq 1$ means $a_t=O(1)$.
+
+Lemma \ref{lemma:weight} can thus be proven in a similar manner as Theorem 1 of \cite{liu2018}.  Lemma \ref{lemma:Q} can be similarly proven as Lemma 1 of \cite{shi2020reinforcement}. Theorem \ref{thm:double} can be proven in a similar manner as Theorem \ref{thm:oracleest}. 
+In the following, we focus on proving Theorems \ref{thm:oracle}, \ref{thm:oracleest} and Lemma \ref{lemma:EP}. 
+\subsection{Proof of Theorem \ref{thm:oracle}}
+To prove Theorem \ref{thm:oracle}, we apply the central limit theorem for mixing triangle arrays developed in \cite{francq2005central}. Define
+\begin{eqnarray*}
+	\widehat{V}_t^{\hbox{\scriptsize{DR}}*}(\bm{\pi})=\frac{1}{N}\sum_{i=1}^N \left[V_i^*(\bm{\pi})+ \omega_{i,t}^*\frac{\mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi}))}{b_i(\bm{\pi}|S_{0,t},S_{i,t},\widetilde{S}_{i,t})}
+	\{R_{i,t}+Q_{i,t+1}^*(\bm{\pi})-Q_{i,t}^*-V_i^*(\bm{\pi})\}\right],
+\end{eqnarray*}
+we have $\widehat{V}^{\hbox{\scriptsize{DR}}*}(\bm{\pi})=T^{-1} \sum_{t=0}^{T-1} \widehat{V}_t^{\hbox{\scriptsize{DR}}*}(\bm{\pi})$. 
+
+Suppose we have shown each $\widehat{V}_t^{\hbox{\scriptsize{DR}}*}(\bm{\pi})$ is an unbiased estimator for $V(\bm{\pi})$. For $t\in \{0,1,\cdots,T-1\}$, let $x_t=(NT)^{-1/2} \{\widehat{V}_t^{\hbox{\scriptsize{DR}}*}(\bm{\pi})-V(\bm{\pi})\}$. It suffices to show the conditions in (1)-(5) of \cite{francq2005central} hold for $\{x_t:0\le t<T\}$. We next verify these conditions.
+
+\textbf{Condition (1).} Note that $\{R_{i,t}, Q_i^*, \omega_{i}^*, V_i(\bm{\pi}):1\le i\le N,t\ge 0\}$ are uniformly bounded from infinity, the set of functions $\{b_i:1\le i\le N\}$ are uniformly bounded from zero. As such, $\{x_t:0\le t<T\}$ are uniformly bounded. Condition (1) thus holds for any $\nu^*>0$. 
+
+\textbf{Condition (2).} This condition is automatically implied by the assumption that $ NT \Var\{\widehat{V}^{\hbox{\scriptsize{DR}}*}(\bm{\pi})\}\to \sigma^2>0$. 
+
+\textbf{Condition (3).} This condition holds by setting $\kappa=0$ and $T_n=0$ for any $n$.
+
+\textbf{Condition (4).} Note that the strong mixing coefficients are upper bounded by the $\beta$-mixing coefficients. Under Condition (A2), we can take the sequence $\alpha(h)$ in Condition (4) by $\kappa_0 \rho^h$. 
+
+\textbf{Condition (5).} Since $\kappa_0 \rho^h$ decays to zero at an exponential rate as $h$ grows to infinity, Condition (5) is automatically satisfied. 
+
+It remains to show $\Mean \widehat{V}_t^{\hbox{\scriptsize{DR}}*}(\bm{\pi})=V(\bm{\pi})$ for any $t$. Suppose (A4) holds. Under the given conditions, we have $V_i^*(\bm{\pi})=V_i(\bm{\pi})$. By Lemma \ref{lemma:Q}, we have
+\begin{eqnarray*}
+	\Mean \{R_{i,t}+Q_{i,t+1}^*(\bm{\pi})-Q_{i,t}^*-V_i^*(\bm{\pi})|\bm{A}_t,\bm{S}_t\}=0,
+\end{eqnarray*}
+and hence,
+\begin{eqnarray*}
+	\Mean \omega_{i,t}^*\frac{\mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi}))}{b_i(\bm{\pi}|S_{0,t},S_{i,t},\widetilde{S}_{i,t})}
+	\{R_{i,t}+Q_{i,t+1}^*(\bm{\pi})-Q_{i,t}^*-V_i^*(\bm{\pi})\}=0.
+\end{eqnarray*}
+Consequently, $\Mean \widehat{V}_t^{\hbox{\scriptsize{DR}}*}(\bm{\pi})=N^{-1} \sum_{i=1}^N V_i(\bm{\pi})=V(\bm{\pi})$.
+
+Suppose (A3) holds. Then we have $\omega_{i,t}^*=\omega_{i,t}$ for any $i,t$ where $\omega_{i,t}$ is a shorthand for $\omega_i(\bm{\pi},S_{0,t},S_{i,t},\widetilde{S}_{i,t})$. As a result, for any $i,t$, the expectation of the density ratio $\omega_{i,t}^*\mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi}))/b_i(\bm{\pi}|S_{0,t},S_{i,t},\widetilde{S}_{i,t})$ equals one. As such, we have
+\begin{eqnarray}\label{eqn:proofthm1}
+\begin{split}
+	\Mean \left\{V_i^*(\bm{\pi})- \omega_{i,t}^*\frac{\mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi}))}{b_i(\bm{\pi}|S_{0,t},S_{i,t},\widetilde{S}_{i,t})}V_i^*(\bm{\pi})\right\}\\
+	=V_i^*(\bm{\pi}) \Mean \left\{1- \omega_{i,t}^*\frac{\mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi}))}{b_i(\bm{\pi}|S_{0,t},S_{i,t},\widetilde{S}_{i,t})} \right\}=0.
+\end{split}	
+\end{eqnarray}
+In addition, using similar arguments in \eqref{eqn:valueliu2018}, we have by (A3) that 
+\begin{eqnarray}\label{eqn:proofthm11}
+	\Mean \left\{\omega_{i,t}^*\frac{\mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi}))}{b_i(\bm{\pi}|S_{0,t},S_{i,t},\widetilde{S}_{i,t})}
+	R_{i,t}\right\}=V_i(\bm{\pi}).
+\end{eqnarray}
+Moreover, by some calculations, we have
+\begin{eqnarray*}
+	\Mean \left\{\omega_{i,t}^*\frac{\mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi}))}{b_i(\bm{\pi}|S_{0,t},S_{i,t},\widetilde{S}_{i,t})}Q_{i,t}^*\right\}=\Mean \left\{  \omega_{i,t}^*\frac{\mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi}))}{b_i(\bm{\pi}|S_{0,t},S_{i,t},\widetilde{S}_{i,t})}Q_{i,t+1}^*(\bm{\pi})\right\}\\
+	=\int_{s_0,s_i,\tilde{s}_i} Q_i^*(\pi_i,\widetilde{A}_i(\bm{\pi}),s_0,s_i,\tilde{s}_i)p(\bm{\pi},s_0,s_i,\tilde{s}_i)ds_0ds_id\tilde{s}_i.
+\end{eqnarray*}
+Consequently,
+\begin{eqnarray*}
+	\Mean \left[\omega_{i,t}^*\frac{\mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi}))}{b_i(\bm{\pi}|S_{0,t},S_{i,t},\widetilde{S}_{i,t})}\{Q_{i,t+1}^*(\bm{\pi})-Q_{i,t}^*\}\right]=0.
+\end{eqnarray*}
+This together with \eqref{eqn:proofthm1} and \eqref{eqn:proofthm11} yields 
+\begin{eqnarray*}
+	\Mean \left[V_i^*(\bm{\pi})+ \omega_{i,t}^*\frac{\mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi}))}{b_i(\bm{\pi}|S_{0,t},S_{i,t},\widetilde{S}_{i,t})}
+	\{R_{i,t}+Q_{i,t+1}^*(\bm{\pi})-Q_{i,t}^*-V_i^*(\bm{\pi})\}\right]=V_i(\bm{\pi}). 
+\end{eqnarray*}
+It follows that $\Mean \widehat{V}^{\hbox{\scriptsize{DR}}*}(\bm{\pi})=V(\bm{\pi})$. 
+
+Thus, $\widehat{V}^{\hbox{\scriptsize{DR}}*}(\bm{\pi})$ is unbiased when either (A3) or (A4) holds. The proof is hence completed. 
+
+\subsection{Proof of Theorem \ref{thm:oracleest}}
+By Theorem \ref{thm:oracle}, it suffices to show $\sqrt{NT}\widehat{V}^{\hbox{\scriptsize{DR}}}(\bm{\pi})$ is asymptotically equivalent to $\sqrt{NT}\widehat{V}^{\hbox{\scriptsize{DR}}*}(\bm{\pi})$. Note that $\widehat{V}^{\hbox{\scriptsize{DR}}}(\bm{\pi})-\widehat{V}^{\hbox{\scriptsize{DR}}*}(\bm{\pi})$ can be decomposed by $\eta_1+\eta_2+\eta_3+\eta_4+\eta_5$ where
+\begin{eqnarray*}
+	\eta_1&=&	\frac{1}{NT}\sum_{t=0}^{T-1}\sum_{i=1}^N \left\{\omega_{i,t}^*\frac{\mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi}))}{b_i(\bm{\pi}|S_{0,t},S_{i,t},\widetilde{S}_{i,t})}-1\right\}\{V_i^*(\bm{\pi})- \widehat{V}_i(\bm{\pi}) \},\\
+	\eta_2&=&%\frac{1}{T}\sum_{t=0}^{T-1} \{\widehat{V}_i(\bm{\pi})-V_i^*(\bm{\pi})\}+
+	\frac{1}{NT}\sum_{t=0}^{T-1}\sum_{i=1}^N \omega_{i,t}^*\frac{\mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi}))}{b_i(\bm{\pi}|S_{0,t},S_{i,t},\widetilde{S}_{i,t})}\{\widehat{Q}_{i,t+1}(\bm{\pi})-\widehat{Q}_{i,t}-Q_{i,t+1}^*(\bm{\pi})+Q_{i,t}^* \},\\
+	\eta_3&=&\frac{1}{NT}\sum_{t=0}^{T-1}\sum_{i=1}^N (\widehat{\omega}_{i,t}-\omega_{i,t}^*)\frac{\mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi}))}{b_i(\bm{\pi}|S_{0,t},S_{i,t},\widetilde{S}_{i,t})}
+	\{R_{i,t}+Q_{i,t+1}^*(\bm{\pi})-Q_{i,t}^*-V_i^*(\bm{\pi})\},\\
+	\eta_4&=&\frac{1}{NT}\sum_{t=0}^{T-1}\sum_{i=1}^N (\widehat{\omega}_{i,t}-\omega_{i,t}^*)\frac{\mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi}))}{b_i(\bm{\pi}|S_{0,t},S_{i,t},\widetilde{S}_{i,t})}\{\widehat{Q}_{i,t+1}(\bm{\pi})-\widehat{Q}_{i,t}-Q_{i,t+1}^*(\bm{\pi})+Q_{i,t}^* \},\\
+	\eta_5&=&\frac{1}{NT}\sum_{t=0}^{T-1}\sum_{i=1}^N (\widehat{\omega}_{i,t}-\omega_{i,t}^*)\frac{\mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi}))}{b_i(\bm{\pi}|S_{0,t},S_{i,t},\widetilde{S}_{i,t})}\{V_i^*(\bm{\pi})-\widehat{V}_i(\bm{\pi}) \}.
+\end{eqnarray*}
+In the following, we show $|\eta_j|=o_p((NT)^{-1/2})$, for $j=1,2,\cdots,5$. 
+
+\textbf{Upper bounds on $|\eta_1|$: }Note that $\eta_1=N^{-1}\sum_{i=1}^N \eta_{1,i}$ where
+\begin{eqnarray*}
+	\eta_{1,i}=\{V_i^*(\bm{\pi})- \widehat{V}_i(\bm{\pi}) \}\left[\frac{1}{T}\sum_{t=0}^{T-1} \left\{\omega_{i,t}^*\frac{\mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi}))}{b_i(\bm{\pi}|S_{0,t},S_{i,t},\widetilde{S}_{i,t})}-1\right\}\right].
+\end{eqnarray*}
+When (A3) holds, we have $\omega_{i,t}^*=\omega_{i,t}$ for any $i,t$. The expectation of the density ratio equals one. As a result, we have
+\begin{eqnarray*}
+	\Mean \left\{\omega_{i,t}\frac{\mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi}))}{b_i(\bm{\pi}|S_{0,t},S_{i,t},\widetilde{S}_{i,t})}-1\right\}=0,
+\end{eqnarray*}
+for any $i,t$. In the following, we apply the Bernstein's inequality for exponential $\beta$-mixing processes \cite{Chen2015} to bound $|\eta_1|$. 
+
+Under Condition (A2), the $\beta$-mixing coefficients of the sequence
+\begin{eqnarray}\label{eqn:set}
+	\left\{\omega_{i,t}\frac{\mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi}))}{b_i(\bm{\pi}|S_{0,t},S_{i,t},\widetilde{S}_{i,t})}-1:t\ge 0\right\},
+\end{eqnarray}
+decays to zero at an exponential rate. In addition, all the terms in \eqref{eqn:set} are uniformly bounded by some constant $c>0$. As a result, 
+\begin{eqnarray*}
+	\max_{t_1,t_2}\Mean \left|\omega_{i,t_1}\frac{\mathbb{I}(A_{i,t_1}=\pi_i,\widetilde{A}_{i,t_1}=\widetilde{A}_i(\bm{\pi}))}{b_i(\bm{\pi}|S_{0,t},S_{i,t_1},\widetilde{S}_{i,t_1})}-1\right|\left|\omega_{i,t_2}\frac{\mathbb{I}(A_{i,t_2}=\pi_i,\widetilde{A}_{i,t_2}=\widetilde{A}_i(\bm{\pi}))}{b_i(\bm{\pi}|S_{0,t_2},S_{i,t_2},\widetilde{S}_{i,t_2})}-1\right|=O(1).
+\end{eqnarray*}
+It thus follows from Theorem 4.2 of \cite{Chen2015} that there exists some constant $C>0$ such that
+there exists some constant $C>0$ such that for any $\tau\ge 0$ and integer $1<q<T$,
+\begin{eqnarray}\nonumber
+&&\max_i \prob\left(\left|\sum_{t=0}^{T-1} \left\{\omega_{i,t}\frac{\mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi}))}{b_i(\bm{\pi}|S_{0,t},S_{i,t},\widetilde{S}_{i,t})}-1\right\} \right|\ge 6\tau \right)\le \frac{T}{q}\beta(q)\\\label{prooflemma3eq8}
+&+&\max_i \prob\left( \left|\sum_{t\in \mathcal{I}_r} \left\{\omega_{i,t}\frac{\mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi}))}{b_i(\bm{\pi}|S_{0,t},S_{i,t},\widetilde{S}_{i,t})}-1\right\}\right|\ge \tau \right)
++4 \exp\left\{-\frac{\tau^2}{Cq(T+\tau)} \right\},
+\end{eqnarray}
+where $\mathcal{I}_r=\{q\floor{T/q},q\floor{T/q} +1, \cdots,T-1\}$. Suppose $\tau\ge qc$. Notice that $|\mathcal{I}_r|\le q$. It follows that
+\begin{eqnarray}\label{prooflemma3eq8.5}
+\max_i \prob\left( \left|\sum_{t\in \mathcal{I}_r} \left\{\omega_{i,t}\frac{\mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi}))}{b_i(\bm{\pi}|S_{0,t},S_{i,t},\widetilde{S}_{i,t})}-1\right\}\right|\ge \tau \right)=0.
+\end{eqnarray}
+Under (A2), $\beta(q)=O(\rho^q)$. Set $q=-3\log (NT)/\log \rho$, we obtain $T\beta(q)/q=O(N^{-3} T^{-2})$. Set $\tau=\max\{2\sqrt{CqT\log (NT)}, 4Cq\log(NT)\}$, we obtain as $T\to \infty$ that
+\begin{eqnarray*}
+	\frac{\tau^2}{2}\ge 2CqT\log (NT)\,\,\,\,\hbox{and}\,\,\,\,\frac{\tau^2}{2}\ge 2Cq\tau \log (nT)\,\,\,\,\hbox{and}\,\,\,\,\tau \ge qc.
+\end{eqnarray*} 
+Since $\sqrt{CqT\log (NT)}\gg 2Cq\log(NT)$, it follows from \eqref{prooflemma3eq8} and \eqref{prooflemma3eq8.5} that 
+\begin{eqnarray*}
+	\max_i \prob\left(\left|\sum_{t=0}^{T-1} \left\{\omega_{i,t}\frac{\mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi}))}{b_i(\bm{\pi}|S_{0,t},S_{i,t},\widetilde{S}_{i,t})}-1\right\} \right|\ge 12\sqrt{CqT\log (NT)} \right)\preceq N^{-2}T^{-2}. 
+\end{eqnarray*}
+By Bonferroni's inequality, we obtain the following event occurs with probability at least $1-O(N^{-1} T^{-1})$,
+\begin{eqnarray*}
+	\max_i \left|\sum_{t=0}^{T-1} \left\{\omega_{i,t}\frac{\mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi}))}{b_i(\bm{\pi}|S_{0,t},S_{i,t},\widetilde{S}_{i,t})}-1\right\} \right|\le 12\sqrt{CqT\log (NT)}.
+\end{eqnarray*}
+It follows that
+\begin{eqnarray}\label{eqn:eta1}
+	|\eta_1|\le \frac{1}{N}\sum_{i=1}^N |\eta_{1,i}|\preceq \frac{\log (NT)}{\sqrt{T}} \left(\frac{1}{N}\sum_{i=1}^N |V_i^*(\bm{\pi})-\widehat{V}_i(\bm{\pi})|\right),
+\end{eqnarray}
+with probability approaching 1. Under (A6) and the condition that $T\gg N\log^4 (NT)$, we obtain $\eta_1=o_p((NT)^{-1/2})$. 
+
+\textbf{Upper bounds on $|\eta_2|$: }When (A3) holds, we have $\omega_{i,t}^*=\omega_{i,t}$ for any $i$ and $t$. As discussed in the proof of Theorem \ref{thm:oracle}, we have $\Mean \eta_{2,i}=0$ for any $i$ where
+\begin{eqnarray*}
+	\eta_{2,i}=
+	\frac{1}{T}\sum_{t=0}^{T-1} \omega_{i,t}^*\frac{\mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi}))}{b_i(\bm{\pi}|S_{0,t},S_{i,t},\widetilde{S}_{i,t})}\{\widehat{Q}_{i,t+1}(\bm{\pi})-\widehat{Q}_{i,t}-Q_{i,t+1}^*(\bm{\pi})+Q_{i,t}^* \}.
+\end{eqnarray*}
+In addition, notice that $\eta_{2,i}$ can be written as
+\begin{eqnarray*}
+	\eta_{2,i}=
+	\frac{1}{T}\sum_{t=0}^{T-1} \omega_{i,t}^*\frac{\mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi}))}{b_i(\bm{\pi}|S_{0,t},S_{i,t},\widetilde{S}_{i,t})}\{\widehat{Q}_{i,t+1}(\bm{\pi})-\widehat{Q}_{i,t}(\bm{\pi})-Q_{i,t+1}^*(\bm{\pi})+Q_{i,t}^*(\bm{\pi}) \}.
+\end{eqnarray*}
+We apply Lemma \ref{lemma:EP} to bound $\max_i |\eta_{2,i}|$. Define the class of functions $\mathcal{Q}_{i,\varepsilon}$ by
+\begin{eqnarray*}
+	\left\{f \in \mathcal{Q}:\max_i \int_{s_0,s_i,\widetilde{s}_i}|f(s_0,s_i,\widetilde{s}_{i})-Q_{i,\bm{\pi}}^*(s_0,s_i,\widetilde{s}_{i})|^2p(b,s_0,s_i,\tilde{s}_i)ds_0ds_id\tilde{s}_i\le \varepsilon \right\},
+\end{eqnarray*}
+where $\varepsilon=\epsilon N^{-1/2} T^{-1/2}$ for some sufficiently small $\epsilon>0$. It then follows from (A5)(ii) and (iii) that $\widehat{Q}_{i,\bm{\pi}}\in \mathcal{Q}_{\varepsilon}$ for any $i$ with probability tending to $1$. As such, we have
+\begin{eqnarray*}
+	\eta_{2,i}\le T^{-1} \sup_{Q_i\in \mathcal{Q}_{i,\varepsilon}} \left|\sum_{t=0}^{T-1} \omega_{i,t}^*\frac{\mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi}))}{b_i(\bm{\pi}|S_{0,t},S_{i,t},\widetilde{S}_{i,t})}\{f(S_{0,t+1},S_{i,t+1},\widetilde{S}_{i,t+1})\right.\\
+	\left.-f(S_{0,t},S_{i,t},\widetilde{S}_{i,t})-Q_{i,t+1}^*(\bm{\pi})+Q_{i,t}^*(\bm{\pi}) \}\right|.
+\end{eqnarray*}
+
+Consider the process $\{(S_{0,t},S_{i,t},\widetilde{S}_{i,t},A_{i,t},\widetilde{A}_{i,t},S_{0,t+1},S_{i,t+1},\widetilde{S}_{i,t+1}):t\ge 0\}$. Under (A2), such a process has $\beta$-mixing coefficients $\{\beta^*(q):q\ge 0 \}$ that satisfies $\beta^*(q)=O(\rho^q)$ as well. For any $f$, define the function $g=g(f)$ such that
+\begin{eqnarray*}
+	&&g(S_{0,t},S_{i,t},\widetilde{S}_{i,t},A_{i,t},\widetilde{A}_{i,t},S_{0,t+1},S_{i,t+1},\widetilde{S}_{i,t+1})=\omega_{i,t}^*\frac{\mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi}))}{b_i(\bm{\pi}|S_{0,t},S_{i,t},\widetilde{S}_{i,t})}\\
+	&\times &\{f(S_{0,t+1},S_{i,t+1},\widetilde{S}_{i,t+1})-f(S_{0,t},S_{i,t},\widetilde{S}_{i,t})
+	-Q_{i,t+1}^*(\bm{\pi})+Q_{i,t}^*(\bm{\pi}) \},
+\end{eqnarray*}
+almost surely. Consider the class of functions $\mathcal{G}_{i,\varepsilon}=\{g(f):f\in \mathcal{Q}_{i,\varepsilon} \}$. Since $\mathcal{Q}_{i,\varepsilon}$ belongs to the class of VC-type class, so does $\mathcal{G}_{i,\varepsilon}$. Moreover, the VC-index of $\mathcal{G}_{i,\varepsilon}$ is the same as $\mathcal{Q}_{i,\varepsilon}$. Under the boundedness assumption in Theorem \ref{thm:double}, we have
+\begin{eqnarray*}
+	\Mean g^2(S_{0,t},S_{i,t},\widetilde{S}_{i,t},A_{i,t},\widetilde{A}_{i,t},S_{0,t+1},S_{i,t+1},\widetilde{S}_{i,t+1})\le O(1) \varepsilon,
+\end{eqnarray*}
+for some constant $O(1)$. In addition, the envelope function of $\mathcal{G}_{i,\varepsilon}$ is uniformly bounded. 
+
+Let $Z_{i,t}=(S_{0,t},S_{i,t},\widetilde{S}_{i,t},A_{i,t},\widetilde{A}_{i,t},S_{0,t+1},S_{i,t+1},\widetilde{S}_{i,t+1})$. Applying Lemma \ref{lemma:EP}, we obtain 
+	\begin{eqnarray*}
+	\max_i \prob\left(\sup_{g\in \mathcal{G}_{i,\varepsilon}}\left|\sum_{t=0}^{T-1} g(Z_{i,t})\right|>c\sqrt{\nu q\varepsilon T \log \left(\frac{1}{\varepsilon}\right)}+c\nu \log \left(\frac{1}{\varepsilon}\right)+c q\tau+c q\right)\\
+	\le c q\exp\left(-\frac{\tau^2q}{cT\varepsilon }\right)+cq\exp\left(-\frac{\tau}{c}\right)+\frac{T\beta(q)}{q},
+\end{eqnarray*}
+for some constant $c>0$. Set $q=-2\log (NT)/\log \rho$, we have $T\beta(q)/q=O(N^{-2} T^{-1})$. Set $\tau=\max(2c\log (NT), \sqrt{2c\varepsilon T\log (NT)/q})$, the RHS is bounded by $O(N^{-2} T^{-1} \log (NT))$. By Bonferroni's inequality, we obtain with probability tending to $1$ that
+\begin{eqnarray*}
+	T|\eta_{2,i}|\le c\sqrt{\nu q\varepsilon T \log \left(\frac{1}{\varepsilon}\right)}+c\nu \log \left(\frac{1}{\varepsilon}\right)+c q\tau+c q,\,\,\,\,\forall i\in \{1,\cdots,N\},
+\end{eqnarray*}
+or equivalently,
+\begin{eqnarray*}
+	\max_i |\eta_{2,i}|\preceq \sqrt{\frac{\epsilon}{NT}}+o\left(\frac{1}{\sqrt{NT}}\right),
+\end{eqnarray*}
+under the condition that $T\gg N \nu^2 \log^4 (NT)$. Since $\epsilon$ can be chosen arbitrarily small, we obtain $\max_i |\eta_{2,i}|=o_p((NT)^{-1/2})$. This in turn implies $\eta_2=o_p((NT)^{-1/2})$.
+
+\textbf{Upper bounds on $|\eta_3|$: }Using similar arguments in proving $\eta_2=o_p((NT)^{-1/2})$, we can show $\eta_3=o_p((NT)^{-1/2})$. We omit the technical details to save space. 
+
+\textbf{Upper bounds on $|\eta_4|$ and $|\eta_5|$: }We show $\eta_4=o_p((NT)^{-1/2})$ only. Using similar arguments, one can show $\eta_5=o_p((NT)^{-1/2})$. 
+
+Note that
+\begin{eqnarray*}
+	\eta_4=\frac{1}{NT}\sum_{t=0}^{T-1}\sum_{i=1}^N (\widehat{\omega}_{i,t}-\omega_{i,t}^*)\frac{\mathbb{I}(A_{i,t}=\pi_i,\widetilde{A}_{i,t}=\widetilde{A}_i(\bm{\pi}))}{b_i(\bm{\pi}|S_{0,t},S_{i,t},\widetilde{S}_{i,t})}\{\widehat{Q}_{i,t+1}(\bm{\pi})-\widehat{Q}_{i,t}(\bm{\pi})-Q_{i,t+1}^*(\bm{\pi})+Q_{i,t}^*(\bm{\pi}) \}\\
+	\le O(1) \frac{1}{NT}\sum_{t=0}^{T-1}\sum_{i=1}^N |\widehat{\omega}_{i,t}-\omega_{i,t}^*||\widehat{Q}_{i,t+1}(\bm{\pi})-\widehat{Q}_{i,t}(\bm{\pi})-Q_{i,t+1}^*(\bm{\pi})+Q_{i,t}^*(\bm{\pi})|\\
+	\le O(1) \left\{ \frac{1}{NT}\sum_{t=0}^{T-1}\sum_{i=1}^N [(\widehat{\omega}_{i,t}-\omega_{i,t}^*)^2+\{\widehat{Q}_{i,t+1}(\bm{\pi})-\widehat{Q}_{i,t}(\bm{\pi})-Q_{i,t+1}^*(\bm{\pi})+Q_{i,t}^*(\bm{\pi})\}^2] \right\}\\
+	\le O(1) \left\{ \frac{1}{NT}\sum_{t=0}^{T-1}\sum_{i=1}^N (\widehat{\omega}_{i,t}-\omega_{i,t}^*)^2\right\}+O(1) \left\{ \frac{1}{NT}\sum_{t=0}^{T}\sum_{i=1}^N\{\widehat{Q}_{i,t}(\bm{\pi})- Q_{i,t}^*(\bm{\pi})\}^2\right\},
+\end{eqnarray*}
+where $O(1)$ denotes some universal constant, and the last two inequalities are due to Cauchy-Schwarz inequality. 
+
+To prove $\eta_4=o_p((NT)^{-1/2})$, it suffices to show
+\begin{eqnarray}\label{eqn:Qsq}
+\max_i \left[\frac{1}{T} \sum_{t=0}^{T}\{\widehat{Q}_{i,t}(\bm{\pi})-Q_{i,t}^*(\bm{\pi})\}^2 \right]=o_p((NT)^{-1/2}),
+\end{eqnarray}
+and
+\begin{eqnarray}\label{eqn:omegasq}
+	\max_i \left\{ \frac{1}{T} \sum_{t=0}^{T-1}(\widehat{\omega}_{i,t}-\omega_{i,t}^*)^2 \right\}=o_p((NT)^{-1/2}).
+\end{eqnarray}
+
+
+The left-hand-side (LHS) of \eqref{eqn:Qsq} can be upper bounded by
+\begin{eqnarray*}
+	\max_i \sup_{f\in \mathcal{Q}_{i,\varepsilon}} \left[\frac{1}{T}\sum_{t=0}^T \{f(Z_{i,t})-Q_{i,t}^*(\bm{\pi})\}^2 \right],
+\end{eqnarray*}
+with probability tending to $1$. 
+Using similar arguments in proving $\eta_2=o_p((NT)^{-1/2})$, we can show
+\begin{eqnarray*}
+	\max_i \sup_{f\in \mathcal{Q}_{i,\varepsilon}} \left|\frac{1}{T}\sum_{t=0}^T \{f(Z_{i,t})-Q_{i,t}^*(\bm{\pi})\}^2-\frac{1}{T}\sum_{t=0}^T \Mean \{f(Z_{i,t})-Q_{i,t}^*(\bm{\pi})\}^2  \right|\preceq \frac{\epsilon}{\sqrt{NT}}+o\left(\frac{1}{\sqrt{NT}}\right),
+\end{eqnarray*} 
+with probability tending to $1$. Under (A6), we have
+\begin{eqnarray*}
+	\max_i \sup_{f\in \mathcal{Q}_{i,\varepsilon}} \left|\frac{1}{T}\sum_{t=0}^T \Mean \{f(Z_{i,t})-Q_{i,t}^*(\bm{\pi})\}^2  \right|\preceq \frac{\epsilon}{\sqrt{NT}}.
+\end{eqnarray*} 
+It follows that 
+\begin{eqnarray*}
+	\max_i \sup_{f\in \mathcal{Q}_{i,\varepsilon}} \left[\frac{1}{T}\sum_{t=0}^T \{f(Z_{i,t})-Q_{i,t}^*(\bm{\pi})\}^2 \right]\preceq \frac{\epsilon}{\sqrt{NT}}+o\left(\frac{1}{\sqrt{NT}}\right),
+\end{eqnarray*}
+with probability tending to $1$. Let $\epsilon\to 0$, we obtain \eqref{eqn:Qsq}. Similarly, we can show \eqref{eqn:omegasq} holds. The proof is hence completed. 
+
+\subsection{Proof of Lemma \ref{lemma:EP}}
+We break the proof into three steps. In the first step, we use Berbee's coupling lemma \citep[see Lemma 4.1 in][]{Dedecker2002} to approximate $\sup_{f\in \mathcal{F}}|\sum_{t=0}^{T-1} f(Z_t)|$ by sum of i.i.d. variables. In the second step, we apply the tail inequality in Lemma 1 of \cite{Adam2008} to bound the derivation between the empirical process and its mean. Finally, we apply the maximal inequality in Corollary 5.1 of \cite{cherno2014} to bound the expectation of the empirical process. 
+
+\textbf{Step 1.} Following the discussion below Lemma 4.1 of \cite{Dedecker2002},  we can construct a sequence of random variables $\{Z_{t}^0:t\ge 0\}$ such that
+\begin{eqnarray}\label{eqn:step1eq1}
+	\sup_{f\in \mathcal{F}}\left|\sum_{t=0}^{T-1} f(Z_t)\right|=\sup_{f\in \mathcal{F}}\left|\sum_{t=0}^{T-1} f(Z_t^0)\right|,
+\end{eqnarray}
+with probability at least $1-T\beta(q)/q$, and that the sequences $\{U_{2i}^0:i\ge 0\}$ and $\{U_{2i+1}^0:i\ge 0\}$ are i.i.d. where $U_i^0=(Z_{iq}^0,Z_{iq+1}^0,\cdots,Z_{iq+q-1}^0)$. 
+
+Recall that $\mathcal{I}_r=\{q\floor{T/q},q\floor{T/q} +1, \cdots,T-1\}$, we have
+\begin{eqnarray*}
+	\sup_{f\in \mathcal{F}}\left|\sum_{t=0}^{T-1} f(Z_t^0)\right|\le \sum_{j=0}^{q-1}\sup_{f\in \mathcal{F}} \left|\sum_{t=0}^{\floor{T/q}} f(Z_{tq+j}^0)\right|+\sup_{f\in \mathcal{F}}\left|\sum_{t\in \mathcal{I}_r} f(Z_t^0)\right|.
+\end{eqnarray*}
+Under the boundedness assumption on $F$, the second term on the right-hand-side (RHS) is bounded from above by $Mq$. Without loss of generality, suppose $\floor{T/q}$ is an even number. The first term on the RHS can be bounded from above by $\sum_{j=0}^{2q-1}\sup_{f\in \mathcal{F}} |\sum_{t=0}^{\floor{T/(2q)}} f(Z_{2tq+j}^0)|$. To summarize, we have shown
+\begin{eqnarray*}
+	\sup_{f\in \mathcal{F}}\left|\sum_{t=0}^{T-1} f(Z_t^0)\right|\le \sum_{j=0}^{2q-1}\sup_{f\in \mathcal{F}} \left|\sum_{t=0}^{\floor{T/(2q)}} f(Z_{2tq+j}^0)\right|+Mq.
+\end{eqnarray*}
+This together with \eqref{eqn:step1eq1} yields that
+\begin{eqnarray}\label{eqn:step1eq2}
+	\prob\left(\sup_{f\in \mathcal{F}}\left|\sum_{t=0}^{T-1} f(Z_t)\right|>2\tau q+Mq\right)\le \prob\left(\sum_{j=0}^{2q-1}\sup_{f\in \mathcal{F}} \left|\sum_{t=0}^{\floor{T/(2q)}} f(Z_{2tq+j}^0)\right|>2\tau q\right)+\frac{T\beta(q)}{q},
+\end{eqnarray}
+for any $\tau>0$. By Bonferroni's inequality, we obtain
+\begin{eqnarray*}
+	\prob\left(\sum_{j=0}^{2q-1}\sup_{f\in \mathcal{F}} \left|\sum_{t=0}^{\floor{T/(2q)}} f(Z_{2tq+j}^0)\right|>2\tau q\right)\le \sum_{j=0}^{2q-1} \prob\left(\sup_{f\in \mathcal{F}} \left|\sum_{t=0}^{\floor{T/(2q)}} f(Z_{2tq+j}^0)\right|>\tau \right),
+\end{eqnarray*}
+for any $\tau>0$. Since the process is stationary, we obtain
+\begin{eqnarray*}
+	\prob\left(\sum_{j=0}^{2q-1}\sup_{f\in \mathcal{F}} \left|\sum_{t=0}^{\floor{T/(2q)}} f(Z_{2tq+j}^0)\right|>2\tau q\right)\le 2q \prob\left(\sup_{f\in \mathcal{F}} \left|\sum_{t=0}^{\floor{T/(2q)}} f(Z_{2tq}^0)\right|>\tau \right).
+\end{eqnarray*}
+Combining this together with \eqref{eqn:step1eq2} yields 
+\begin{eqnarray}\label{eqn:step1eq3}
+\prob\left(\sup_{f\in \mathcal{F}}\left|\sum_{t=0}^{T-1} f(Z_t)\right|>2\tau q+Mq\right)\le 2q \prob\left(\sup_{f\in \mathcal{F}} \left|\sum_{t=0}^{\floor{T/(2q)}} f(Z_{2tq}^0)\right|>\tau \right)+\frac{T\beta(q)}{q}.
+\end{eqnarray}
+By construction, $\{Z_{2tq}^0:t\ge 0\}$ are i.i.d. This completes the proof of the first step. 
+
+\textbf{Step 2.} In the second step, we focus on relating the empirical process $\sup_{f\in \mathcal{F}} |\sum_{t=0}^{\floor{T/(2q)}} f(Z_{2tq}^0)|$ to its expectation. Without loss of generality, assume $T=kq$ for some integer $k>0$. Set the constants $\eta$ and $\delta$ in Lemma 1 of \cite{Adam2008} to 1, we obtain
+\begin{eqnarray*}
+	\prob\left(\sup_{f\in \mathcal{F}} \left|\sum_{t=0}^{\floor{T/(2q)}} f(Z_{2tq}^0)\right|>2\Mean \sup_{f\in \mathcal{F}} \left|\sum_{t=0}^{\floor{T/(2q)}} f(Z_{2tq}^0)\right| +\tau \right)\\
+	\le 4\exp\left(-\frac{\tau^2}{2T\sigma^2/q}\right)+\exp\left(-\frac{\tau}{CM}\right),
+\end{eqnarray*}
+for some constant $C>0$. Combining this together with \eqref{eqn:step1eq3}, we obtain
+\begin{eqnarray}\label{eqn:step2}
+\begin{split}
+	\prob\left(\sup_{f\in \mathcal{F}}\left|\sum_{t=0}^{T-1} f(Z_t)\right|>4q\Mean \sup_{f\in \mathcal{F}} \left|\sum_{t=0}^{\floor{T/(2q)}} f(Z_{2tq}^0)\right|+2\tau q+Mq\right)\\
+\le 8q\exp\left(-\frac{\tau^2}{2T\sigma^2/q}\right)+2q\exp\left(-\frac{\tau}{CM}\right)+\frac{T\beta(q)}{q},
+\end{split}
+\end{eqnarray}
+for any $\tau>0$. This completes the proof of the second step.
+
+\textbf{Step 3.} It remains to bound $\Mean \sup_{f\in \mathcal{F}} |\sum_{t=0}^{\floor{T/(2q)}} f(Z_{2tq}^0)|$. By Corollary 5.1 of \cite{cherno2014}, we obtain
+\begin{eqnarray*}
+	\Mean \sup_{f\in \mathcal{F}} \left|\sum_{t=0}^{\floor{T/(2q)}} f(Z_{2tq}^0)\right|\preceq \sqrt{\frac{\nu \sigma^2T}{q} \log \left(\frac{AM}{\sigma}\right)}+\nu M \log \left(\frac{AM}{\sigma}\right).
+\end{eqnarray*}
+Combining this together with \eqref{eqn:step2}, we obtain 
+\begin{eqnarray*}
+	\prob\left(\sup_{f\in \mathcal{F}}\left|\sum_{t=0}^{T-1} f(Z_t)\right|>c\sqrt{\nu q\sigma^2T \log \left(\frac{AM}{\sigma}\right)}+c\nu M \log \left(\frac{AM}{\sigma}\right)+c q\tau+Mq\right)\\
+	\le Cq\exp\left(-\frac{\tau^2q}{CT\sigma^2}\right)+Cq\exp\left(-\frac{\tau}{CM}\right)+\frac{T\beta(q)}{q},
+\end{eqnarray*}
+for some constants $c,C>0$ and any $\tau>0,1\le q<T/2$. The proof is hence completed. 
+
+\bibliography{CausalMARL}
+\bibliographystyle{plain}
+	
+\end{document}

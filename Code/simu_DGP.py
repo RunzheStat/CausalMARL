@@ -13,12 +13,14 @@ from _utility import *
         adj_mat: binary adjacent matrix
         [[O, D, M], A, R]
 """
-def DG_once(seed = 1, l = 5, T = 14 * 48, time_dependent = False, w_A = 1, w_O = 1, sd_R  = 1, sd_D = 1, sd_O = 1, 
-            u_O = None, M_in_R = M_in_R, #True,
-            mean_reversion = mean_reversion, u_O_u_D = u_O_u_D, 
+def DG_once(seed = 1, l = 5, T = 14 * 48, time_dependent = False, DGP_choice = None, 
+            w_A = 1, w_O = 1, sd_R  = 1, sd_D = 1, sd_O = 1, 
+            u_O = None, 
            TARGET = False, target_policy = None, T_burn_in = 100):  
     """ prepare data (fixed)
     """
+    M_in_R, mean_reversion, poisO, simple, u_O_u_D = DGP_choice
+    
     T = T + T_burn_in
     npseed(seed)
     N = l ** 2
@@ -38,10 +40,12 @@ def DG_once(seed = 1, l = 5, T = 14 * 48, time_dependent = False, w_A = 1, w_O =
     w_M = 0.5    # 0.8
 
     # O: the pattern (spatial distribution) of orders
-    O = rpoisson(u_O, (T, N)).T    
-#     O = np.repeat(u_O, T).reshape(N, T) +  (rpoisson(sd_O, (N, T)) - sd_O) #randn(N,T) #/ 10
-#     O[O < 0] = 0
-    
+    if poisO == True:
+        O = rpoisson(u_O, (T, N)).T    
+    else:
+        O = np.repeat(u_O, T).reshape(N, T) +  (rpoisson(sd_O, (N, T)) - sd_O) #randn(N,T) #/ 10
+        O[O < 0] = 0
+
     # Actions
     if TARGET: # target. fixed. 
         A = arr([[target_policy[i](None, random_choose = True) for j in range(T)] for i in range(N)])
@@ -148,20 +152,3 @@ def simu_target_policy_pattern(l = 3, u_O = None, threshold = 12, print_flag = T
             print("\n")
         print("number of reward locations: ", sum(fixed_policy))
     return pi#, sum(fixed_policy)
-
-##########################################################################################################################################################
-
-# mean reversion for stationality; 
-            # then how about attraction? not ideal? action effect?
-            # can be put before P(). Then no problem any longer.
-#         if not mean_reversion:
-
-#         else: # mean-reversion
-#             if time_dependent:
-#                 D_t = (D_t + mean_OD[t]) // 2  
-#             else:
-#                 if is_homogenous:
-#                     D_t = (D_t + 10) // 2 
-#                 else:
-#                     D_t = (D_t + u_O) // 2 
-#             D_t = np.round(arr([a for a in D_t]) + e_D[:, t])

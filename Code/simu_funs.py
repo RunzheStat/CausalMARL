@@ -11,7 +11,7 @@ from simu_DGP import *
 
 """ Generate a pattern and four target policy (also one no treatment policy) and run the simu_once for OPE_rep_times times.
 """
-def simu(pattern_seed = 1,  l = 5, T = 14 * 24, thre_range = [9, 10, 11, 12, 13], # Setting - general
+def simu(pattern_seed = 1,  l = 5, T = 14 * 24, thre_range = [9, 10, 11, 12, 13], DGP_choice = None, # Setting - general
          OPE_rep_times = 20, n_cores = n_cores, inner_parallel = False,  # Parallel
          time_dependent = False, # DGP / target
          dim_S_plus_Ts = 3 + 3, epsilon = 1e-6,  # fixed
@@ -25,7 +25,7 @@ def simu(pattern_seed = 1,  l = 5, T = 14 * 24, thre_range = [9, 10, 11, 12, 13]
         ): 
     """ generate the order pattern (used by all rep, shared by b and pi)
     """
-
+    
     npseed(pattern_seed)
 #     u_O = rlogN(2.4, sd_u_O, l**2) 
     u_O = rlogN(4.6, sd_u_O, l**2)
@@ -43,12 +43,12 @@ def simu(pattern_seed = 1,  l = 5, T = 14 * 24, thre_range = [9, 10, 11, 12, 13]
         target_policys.append(target_policy)
         
     # generate the adj for the grid
-    neigh = adj2neigh(getAdjGrid(l, simple = simple))
+    neigh = adj2neigh(getAdjGrid(l, simple = DGP_choice[3]))
     
     """ parallel
     """
     def once(seed):
-        return simu_once(seed = seed, l = l, T = T, time_dependent = time_dependent,  
+        return simu_once(seed = seed, l = l, T = T, time_dependent = time_dependent,  DGP_choice = DGP_choice,
                          u_O = u_O,  
                          target_policys = target_policys, w_A = w_A, w_O = w_O, dim_S_plus_Ts = dim_S_plus_Ts, n_cores = n_cores, 
                           penalty = penalty, penalty_NMF = penalty_NMF, 
@@ -69,9 +69,11 @@ def simu(pattern_seed = 1,  l = 5, T = 14 * 24, thre_range = [9, 10, 11, 12, 13]
     """
     good_setting_flag = 0
     print(Dash)
+    
+    Values_outputs_targets = []
     for i in range(len(target_policys)):
         target_policy = target_policys[i]
-        V_MC, std_V_MC = MC_Value(l = l, T = T, time_dependent = time_dependent,  
+        V_MC, std_V_MC = MC_Value(l = l, T = T, time_dependent = time_dependent,  DGP_choice = DGP_choice, 
                                   u_O = u_O, sd_D = sd_D, sd_R = sd_R, sd_O = sd_O, w_A = w_A, w_O = w_O, 
                                   target_policy = target_policy, reps = 100, 
                                   inner_parallel = inner_parallel)
@@ -87,7 +89,7 @@ def simu(pattern_seed = 1,  l = 5, T = 14 * 24, thre_range = [9, 10, 11, 12, 13]
         
         
         
-        """ Value estimation
+        """ Value
         """
 #         bias = np.round(np.abs(np.mean(V_OPE, 0) - V_MC), 2)
         bias = np.round(np.mean(V_OPE, 0) - V_MC, 2)
@@ -95,59 +97,69 @@ def simu(pattern_seed = 1,  l = 5, T = 14 * 24, thre_range = [9, 10, 11, 12, 13]
         mse = np.round(np.sqrt(bias**2 + std**2), 2)
         mse_rel = np.round(mse - mse[0], 2)
         bias = list(bias); std = list(std); mse = list(mse); mse_rel = list(mse_rel) 
-        res = "   [DR/QV/IS]; [DR/QV/IS]_NO_MARL; [DR/QV/IS]_NO_MF; [DR2, V_behav]" + "\n" + "bias:" + str([bias[:3]]) + str([bias[3:6]]) + str([bias[6:9]]) + str([bias[9:]]) + "\n" + "std:" + str([std[:3]]) + str([std[3:6]]) + str([std[6:9]]) + str([std[9:]])
+        res = "   [DR/QV/IS]; [DR_NO_MARL, DR_NO_MF, V_behav]" + "\n" + \
+        "bias:" + str([bias[:3]]) + str([bias[3:6]]) + "\n" + \
+        "std:" + str([std[:3]]) + str([std[3:6]])
         print(res)
-        printB("MSE:" + str([mse[:3]]) + str([mse[3:6]]) + str([mse[6:9]]) + str([mse[9:]]))
-        printB("MSE(-DR):" + str([mse_rel[:3]]) + str([mse_rel[3:6]]) + str([mse_rel[6:9]]) + str([mse_rel[9:]])) # + "\n"
-        if file is not None:        
-            print(res + "\n" + "MSE(-DR):" + str([mse_rel[:3]]) + str([mse_rel[3:6]]) + str([mse_rel[6:9]]) + str([mse_rel[9:]]) + "\n", file = file)
+        printB("MSE:" + str([mse[:3]]) + str([mse[3:6]])) 
+        printB("MSE(-DR):" + str([mse_rel[:3]]) + str([mse_rel[3:6]])) 
 
         if mse_rel[0] <= np.min(mse_rel[2:4]):
-            cprint("******", 'white', 'on_red')
-            print("*****BETTER THAN [QV, IS, DR_NO_MARL]*****", file = file)
+            cprint("***", 'white', 'on_red')
             good_setting_flag += 1
-        elif mse_rel[0] <= np.min(mse_rel[3:6]):  
-            cprint("better than DR_NO_MARL", "yellow")
-            print("better than [DR_NO_MARL]", file = file)
-            
-    
-        """ ATE estimation
+        elif mse_rel[0] <= np.min(mse_rel[3]):  
+            cprint("**", "grey", "on_yellow")
+
+#         res = "   [DR/QV/IS]; [DR/QV/IS]_NO_MARL; [DR/QV/IS]_NO_MF; [V_behav]" + "\n" + "bias:" + str([bias[:3]]) + str([bias[3:6]]) + str([bias[6:9]]) + str([bias[9]]) + "\n" + \
+#         "std:" + str([std[:3]]) + str([std[3:6]]) + str([std[6:9]]) + str([std[9]])
+#         print(res)
+#         printB("MSE:" + str([mse[:3]]) + str([mse[3:6]]) + str([mse[6:9]]) + str([mse[9]]))
+#         printB("MSE(-DR):" + str([mse_rel[:3]]) + str([mse_rel[3:6]]) + str([mse_rel[6:9]]) + str([mse_rel[9]])) # + "\n"
+
+#         if mse_rel[0] <= np.min(mse_rel[2:4]):
+#             cprint("***", 'white', 'on_red')
+#             good_setting_flag += 1
+#         elif mse_rel[0] <= np.min(mse_rel[3]):  
+#             cprint("**", "grey", "on_yellow")
+        
+        Values_output = [arr(bias), arr(std), arr(mse)]
+        Values_outputs_targets.append(Values_output)
+        
+        """ ATE 
         """
-        if i == 0:
-            V_0 = V_OPE #  rep * n_estimates
-            MC_0 = V_MC # a number
-        else:  # 【bias, variance, MSE】 for 【\hat{V_target} - \hat{V}_0】
-            ATE = arr(V_OPE) - V_0
-            MC_ATE = V_MC - MC_0
-            printR("MC-based ATE = " + str(round(MC_ATE, 2)))
+#         if i == 0:
+#             V_0 = V_OPE #  rep * n_estimates
+#             MC_0 = V_MC # a number
+#         else:  # 【bias, variance, MSE】 for 【\hat{V_target} - \hat{V}_0】
+#             ATE = arr(V_OPE) - V_0
+#             MC_ATE = V_MC - MC_0
+#             printR("MC-based ATE = " + str(round(MC_ATE, 2)))
             
-#             bias = np.round(np.abs(np.mean(ATE, 0) - MC_ATE), 2)
-            bias = np.round(np.mean(ATE, 0) - MC_ATE, 2)
-            std = np.round(np.std(ATE, 0), 2)
-            mse = np.round(np.sqrt(bias**2 + std**2), 2)
-            mse_rel = np.round(mse - mse[0], 2)
-            bias = list(bias); std = list(std); mse = list(mse); mse_rel = list(mse_rel) 
-            res = "   [DR/QV/IS]; [DR/QV/IS]_NO_MARL; [DR2]" + "\n" + "bias:" + str([bias[:3]]) + str([bias[3:6]]) + str([bias[6:9]]) + str([bias[9]]) + "\n" + "std:" + str([std[:3]]) + str([std[3:6]]) + str([std[6:9]]) + str([std[9]])
-            print(res)
-            printB("MSE:" + str([mse[:3]]) + str([mse[3:6]]) + str([mse[6:9]]) + str([mse[9]])) 
-            printB("MSE(-DR):" + str([mse_rel[:3]]) + str([mse_rel[3:6]]) + str([mse_rel[6:9]]) + str([mse_rel[9]])) #  + "\n"
-            if file is not None:        
-                print(res + "\n" + "MSE(-DR):" + str([mse_rel[:3]]) + str([mse_rel[3:6]]) + str([mse_rel[6:9]]) + str([mse_rel[9]]) + "\n", file = file)
+#             bias = np.round(np.mean(ATE, 0) - MC_ATE, 2)
+#             std = np.round(np.std(ATE, 0), 2)
+#             mse = np.round(np.sqrt(bias**2 + std**2), 2)
+#             mse_rel = np.round(mse - mse[0], 2)
+#             bias = list(bias); std = list(std); mse = list(mse); mse_rel = list(mse_rel) 
+#             res = "   [DR/QV/IS]; [DR/QV/IS]_NO_MARL; [DR/QV/IS]_NO_MF; [V_behav]" + "\n" + "bias:" + str([bias[:3]]) + str([bias[3:6]]) + str([bias[6:9]]) + str([bias[9]]) + "\n" + \
+#             "std:" + str([std[:3]]) + str([std[3:6]]) + str([std[6:9]]) + str([std[9]])
+#             print(res)
+#             print("MSE:" + str([mse[:3]]) + str([mse[3:6]]) + str([mse[6:9]]) + str([mse[9]])) 
+#             print("MSE(-DR):" + str([mse_rel[:3]]) + str([mse_rel[3:6]]) + str([mse_rel[6:9]]) + str([mse_rel[9]])) #  + "\n"
 
-            if mse_rel[0] <= np.min(mse_rel[2:4]):
-                cprint("******", 'white', 'on_red')
-                print(" ***** BETTER THAN [IS, DR_NO_MARL] *****", file = file)
-                good_setting_flag += 1
-            elif mse_rel[0] <= np.min(mse_rel[3:6]):     
-                cprint("better than DR_NO_MARL", "yellow")
-                print("better than [DR_NO_MARL]", file = file) 
+            
+#             if mse_rel[0] <= np.min(mse_rel[2:4]):
+#                 cprint("*", 'white', 'on_blue')
+#                 good_setting_flag += 1
+#             elif mse_rel[0] <= np.min(mse_rel[3]):     
+#                 cprint("**", "grey", "on_yellow")
         cprint('==============',  attrs = ["bold"]); print("\n")
-    if good_setting_flag == int(len(target_policys) * 2):
+    if good_setting_flag == int(len(target_policys) ):#* 2
         printR("******************** THIS SETTING IS GOOD ********************")
-    return None#[V_OPE, V_MC, std_V_MC]
+    
+    return Values_outputs_targets # a list (len-N_target) of list of [bias, std, MSE] (each is a vector). 
 
 
-def simu_once(seed = 1, l = 3, T = 14 * 24, time_dependent = False, 
+def simu_once(seed = 1, l = 3, T = 14 * 24, time_dependent = False, DGP_choice = None, 
               target_policys = None, 
               sd_D = 3, sd_R = 0, sd_O = 1, 
               CV_QV = False, 
@@ -167,10 +179,10 @@ def simu_once(seed = 1, l = 3, T = 14 * 24, time_dependent = False,
     def Ts(S_neigh):
         return np.mean(S_neigh, 0)
     def Ta(A_neigh):
-        return Ta_disc(np.mean(A_neigh, 0), simple = simple)
+        return Ta_disc(np.mean(A_neigh, 0), simple = DGP_choice[3])
     
     # observed data following behav
-    data, adj_mat, details = DG_once(seed = seed, l = l, T = T, 
+    data, adj_mat, details = DG_once(seed = seed, l = l, T = T, DGP_choice = DGP_choice, 
                                      u_O = u_O, 
                                      time_dependent = time_dependent,  
                                      sd_D = sd_D, sd_R = sd_R, sd_O = sd_O, 
@@ -178,29 +190,29 @@ def simu_once(seed = 1, l = 3, T = 14 * 24, time_dependent = False,
     
     # OPE
     value_targets = []
-    count = 1
     for target_policy in target_policys:
         value_estimators = V_DR(data = data, pi = target_policy, behav = behav, 
                                 adj_mat = adj_mat, dim_S_plus_Ts = dim_S_plus_Ts, n_cores = n_cores, 
-                             time_dependent = time_dependent,  
+                             time_dependent = time_dependent,  simple = DGP_choice[3], 
                              Ts = Ts, Ta = Ta, penalty = penalty, penalty_NMF = penalty_NMF, 
                                 n_layer = n_layer, CV_QV = CV_QV, 
                             w_hidden = w_hidden, Learning_rate = Learning_rate,  
                             batch_size = batch_size, max_iteration = max_iteration, epsilon = epsilon, 
                              inner_parallel = inner_parallel)
         value_targets.append(value_estimators)
-        print(count, end = " "); count += 1
+    if inner_parallel:
+        print("Rep", seed + 1 , "DONE", end = "; ")
     return value_targets
 
 ##########################################################################################################################################################
 """ Apply MC to get the target value
 """
-def MC_Value(l, T, time_dependent, target_policy, u_O = None, 
+def MC_Value(l, T, time_dependent, target_policy, u_O = None, DGP_choice = None, 
              sd_D =  3, sd_R = 0, sd_O = 1, 
              reps = 100, inner_parallel = False, w_A = 1, w_O = .01):
     def oneTraj(seed):
         # Off-policy evaluation with target_policy
-        data, adj_mat, details = DG_once(seed = seed, l = l, T = T, time_dependent = time_dependent, 
+        data, adj_mat, details = DG_once(seed = seed, l = l, T = T, time_dependent = time_dependent, DGP_choice = DGP_choice, 
                                           u_O = u_O, sd_O = sd_O, 
                                          TARGET = True, target_policy = target_policy, 
                                          sd_D = sd_D, sd_R = sd_R, w_A = w_A, w_O = w_O)

@@ -8,7 +8,7 @@ The majority is adapted from the source code of the paper "Breaking the Curse of
 import numpy as np
 from _uti_basic import *
 from _utility import *
-import tensorflow as tf
+import tensorflow as tf # tf.__version__ = 1.13.2
 from time import sleep
 import sys
 from scipy.stats import binom
@@ -34,6 +34,8 @@ class Density_Ratio_kernel(object):
     def __init__(self, obs_dim, w_hidden, Learning_rate, reg_weight, n_layer = 2):
         """ place holder. NN architecture
         """
+#         tf.random.set_seed(0)
+
         self.reg_weight = reg_weight
         self.n_layer = n_layer
         
@@ -242,6 +244,7 @@ class Density_Ratio_kernel(object):
         #################################################################################
         
         ## Get the med_dist for hyperparameter in RKHS
+#         subsamples = tf.random.shuffle(range(N), seed = 1)[:1000]
         subsamples = np.random.choice(N, 1000)
         s = S[subsamples]
         med_dist = np.median(np.sqrt(np.sum(np.square(s[None, :, :] - s[:, None, :]), axis = -1)))
@@ -281,6 +284,7 @@ class Density_Ratio_kernel(object):
             ## Training: pick subsample and run the algorithm 
             # vectorization -> thus s = s2 
             subsamples = np.random.choice(N, batch_size) 
+#             subsamples = tf.random.shuffle(range(N), seed = i)[:batch_size]
             s = S[subsamples]
             sn = SN[subsamples]
             policy_ratio = (PI1[subsamples] + epsilon)/(PI0[subsamples] + epsilon)

@@ -5,25 +5,25 @@ from simu_funs import *
 ##########################################################################################################################################################
 ##########################################################################################################################################################
 
-""" Compute the average reward estimate using DR (and other methods) with one dataset
-Input: 
-    data: a len-N list. data[i] is a len-T list, where data[i][t] is [S_{i,t}, A_{i,t}, R_{i,t}]; 
-        for now, we only use the state in data[i][T]
-    policies:
-        pi: a list (len-N) of the target policies
-        behav: a list (len-N) of the behaviour policy
-        pi(s, a) = a probability # although in didi, may not be the case
-    adj_mat: binary adjacent matrix
-    Ts, Ta: required spatial dependence functions
-Output: the average cumulative reward
-""" 
+
 def V_DR(data, pi, behav, adj_mat, Ts, Ta, 
-         penalty = [[1e-4, 1e-4]], penalty_NMF = None, 
+         penalty = [[1e-2, 1e-2]], penalty_NMF = None, 
          dim_S_plus_Ts = 3 + 3, n_cores = 10,
-            time_dependent = False, simple = False,
+            time_dependent = False, 
             w_hidden = 30, Learning_rate = 1e-3,  n_layer = 2, CV_QV = False, 
             batch_size = 32, max_iteration = 1001,  epsilon = 1e-6, inner_parallel = False): 
-
+    """ Compute the average reward estimate using DR (and other methods) with one dataset
+    Input: 
+        data: a len-N list. data[i] is a len-T list, where data[i][t] is [S_{i,t}, A_{i,t}, R_{i,t}]; 
+            for now, we only use the state in data[i][T]
+        policies:
+            pi: a list (len-N) of the target policies
+            behav: a list (len-N) of the behaviour policy
+            pi(s, a) = a probability # although in didi, may not be the case
+        adj_mat: binary adjacent matrix
+        Ts, Ta: required spatial dependence functions
+    Output: the average cumulative reward
+    """ 
     N, T = len(data), len(data[0]) - 1
     Qi_diffs, V, w_all, values = [], [], [], []
     R = np.mean(np.array([[at[2] for at in a] for a in data]).T, 1)[:T]
@@ -39,7 +39,6 @@ def V_DR(data, pi, behav, adj_mat, Ts, Ta,
         data_neigh = [[j, data[j]] for j in neigh[i]] # for region j, is a (len-N_j) list of [index, data_at_that_index]
         n_neigh = len(neigh[i])
         Ri = arr([a[2] for a in data[i]])[:T]
-        V_behav = np.mean(Ri) # the average reward of behavious policy at location i (no difference?)
         tuples_i = getRegionData(data[i], i, data_neigh, pi, Ts, Ta, mean_field = True, time_dependent = time_dependent)
         
         
@@ -70,6 +69,7 @@ def V_DR(data, pi, behav, adj_mat, Ts, Ta,
         IS_V = wi * Ri
         QV_V = Vi[0] 
         DR2_V = IS_V + QV_V - DR_V # the DR proposed by that paper
+        V_behav = np.mean(Ri) # the average reward of behavious policy at location i (no difference?)
         
 
         """ 2. DR + w/o spatial """
@@ -100,7 +100,7 @@ def V_DR(data, pi, behav, adj_mat, Ts, Ta,
 #         n_neigh = len(data_neigh)
 #         dim_NMF = int(dim_S_plus_Ts / 2 * (n_neigh + 1)) #???
 #         Qi_diff_NMF, Vi_NMF = computeQV(tuples_i = tuples_i, R = Ri, 
-#                                       CV_QV = False, penalty_range = penalty_NMF, 
+#                                       CV_QV = CV_QV, penalty_range = penalty_NMF, 
 #                                       spatial = True, mean_field = False)
 #         if i == 0 and print_time:
 #             print("QV_NMF:", np.round(now() - a, 2)); a = now()
@@ -114,13 +114,13 @@ def V_DR(data, pi, behav, adj_mat, Ts, Ta,
 #         IS_NMF = wi_NMF * Ri
 #         if i == 0 and print_time:
 #             print("Weight_NMF:", np.round(now() - a, 2)); a = now()
+    
+        # DR_V = QV_V = IS_V = DR_V_NS = QV_NS = IS_NS = DR_V_NMF = IS_NMF = DR2_V = 0
         DR_V_NMF = QV_NMF = IS_NMF = 0
-#         DR_V = QV_V = IS_V = DR_V_NS = QV_NS = IS_NS = DR_V_NMF = IS_NMF = QV_NMF = DR2_V  = V_behav = 0
-        
         
         values_i = [np.mean(DR_V), QV_V, np.mean(IS_V), 
-                    np.mean(DR_V_NS), #QV_NS, np.mean(IS_NS), 
-                    np.mean(DR_V_NMF), #QV_NMF, np.mean(IS_NMF), 
+                    np.mean(DR_V_NS), QV_NS, np.mean(IS_NS), 
+                    np.mean(DR_V_NMF), QV_NMF, np.mean(IS_NMF), 
 #                     np.mean(DR2_V), 
                     V_behav] 
 
@@ -280,8 +280,7 @@ def computeQV(tuples_i, R, n_neigh = None,
                 if Bellman_error < min_Bellman_error:
                     min_Bellman_error = Bellman_error
                     optimal_penalty = [mu, lam]
-#                 print([mu, lam], Bellman_error)
-#         print("optimal_penalty [mu, lam]:", optimal_penalty, min_Bellman_error)
+        print("optimal_penalty [mu, lam]:", optimal_penalty)
         return computeQV_basic(tuples_i = tuples_i, R = R, penalty = optimal_penalty, 
                                spatial = spatial, mean_field = mean_field)
                     
@@ -297,7 +296,6 @@ def computeQV(tuples_i, R, n_neigh = None,
         Vi: \hat{V}_{i,pi}
         Qi_diff: a vector (len-T) of Q^pi(pi) - Q^pi(behav)
 """
-
 def computeQV_basic(tuples_i, R, penalty, spatial = True, mean_field = True, 
                     n_neigh = None, 
                     validation_set = None):
@@ -306,11 +304,9 @@ def computeQV_basic(tuples_i, R, penalty, spatial = True, mean_field = True,
     R = arr([a[2] for a in tuples_i]) # began to use Rit
     T = len(tuples_i)
     mu, lam = penalty
-        
+    A_set = set([a[1] for a in tuples_i])
+    Ta_set = set([a[4] for a in tuples_i])
     ## get (S,A) pair
-#     print("tuples_i", tuples_i[0], "R", R, "penalty", penalty)
-    """ RKHS
-    """
     if spatial:
         if mean_field:
             Z = np.array([np.concatenate((a[0], a[3], [a[1]], [a[4]])) for a in tuples_i]) # T * p. [S, Ts, A, Ta]
@@ -318,60 +314,43 @@ def computeQV_basic(tuples_i, R, penalty, spatial = True, mean_field = True,
             ## kernel distance
             def SA_GRBF(Z, gamma, Z2 = None):
                 T, l = Z.shape
-                make_positive = False
                 if Z2 is None:
                     Z2 = Z
-                    make_positive = True
                 dim = int(Z.shape[1] // 2 - 1)
                 I_A = (Z[:, dim * 2].reshape(-1,1) == Z2[:, dim * 2].reshape(1,-1))
                 I_Ta = (Z[:, dim * 2 + 1].reshape(-1,1) == Z2[:, dim * 2 + 1].reshape(1,-1))
                 I_A = np.multiply(I_A, I_Ta)
-                K = GRBF(Z[:,:(l - 2)], Z2[:,:(l - 2)], gamma) 
-                if make_positive:
-                    K = K + identity(T) * 1e-9
+                K = GRBF(Z[:,:(l - 2)], Z2[:,:(l - 2)], gamma) + identity(T) * 1e-8 #???
                 return np.multiply(K, I_A)    
+            
         else:
             Z = np.array([np.concatenate((a[0], a[3], [a[1]], a[4])) for a in tuples_i]) # T * p. [S, Ts, A, Ta]
             Zstar = np.array([np.concatenate((a[5], a[6], [a[7]], a[8])) for a in tuples_i])
             ## kernel distance
             def SA_GRBF(Z, gamma, Z2 = None):
                 T, l = Z.shape
-                make_positive = False
-                if Z2 is None:
-                    Z2 = Z
-                    make_positive = True
                 n_neigh = int((l - 4) / 4)
-                I_A = (Z[:, 3 * (n_neigh + 1)].reshape(-1,1) == Z2[:, 3 * (n_neigh + 1)].reshape(1,-1))
+                I_A = (Z[:, 3 * (n_neigh + 1)].reshape(-1,1) == Z[:, 3 * (n_neigh + 1)].reshape(1,-1))
                 I_Ta = randn(T, T)
                 for i in range(T):
                     for j in range(T):
-                        if np.array_equal(Z[i, (3 * (n_neigh + 1) + 1):], Z2[j, (3 * (n_neigh + 1) + 1):]):
+                        if np.array_equal(Z[i, (3 * (n_neigh + 1) + 1):], Z[j, (3 * (n_neigh + 1) + 1):]):
                             I_Ta[i, j] = 1
                 I_A = np.multiply(I_A, I_Ta)
-                K = GRBF(Z[:, :(3 * (n_neigh + 1))], Z2[:, :(3 * (n_neigh + 1))], gamma) #+ identity(T) * 1e-8
-                if make_positive:
-                    K = K + identity(T) * 1e-9
+                K = GRBF(Z[:, :(3 * (n_neigh + 1))], Z[:, :(3 * (n_neigh + 1))], gamma) + identity(T) * 1e-8
                 return np.multiply(K, I_A)    
     
     else:
         Z = np.array([np.concatenate((a[0], [a[1]])) for a in tuples_i]) # T * p. [S, A, Ts, Ta]
         Zstar = np.array([np.concatenate((a[5], [a[7]])) for a in tuples_i])
         ## kernel distance
-        def SA_GRBF(Z, gamma, Z2 = None):
+        def SA_GRBF(Z, gamma):
             T, l = Z.shape
-            make_positive = False
-            if Z2 is None:
-                Z2 = Z
-                make_positive = True
             dim = int(Z.shape[1] - 1)
-            I_A = (Z[:, dim].reshape(-1,1) == Z2[:, dim].reshape(1,-1))
-            K = GRBF(Z[:,:(l - 1)], Z2[:,:(l - 1)], gamma) #+ identity(T) * 1e-8
-            if make_positive:
-                    K = K + identity(T) * 1e-9
+            I_A = (Z[:, dim].reshape(-1,1) == Z[:, dim].reshape(1,-1))
+            K = GRBF(Z[:,:(l - 1)], Z[:,:(l - 1)], gamma) + identity(T) * 1e-8
             return np.multiply(K, I_A)    
     
-    """ gammas for RKHS
-    """
     Z_tilde = np.vstack((Z, Zstar))
     if spatial:
         if mean_field:
@@ -387,11 +366,13 @@ def computeQV_basic(tuples_i, R, penalty, spatial = True, mean_field = True,
         gamma_g = 1 / (2 * np.median(pdist(Z[:,:(Z.shape[1]-1)]))**2)
         gamma_q = 1 / (2 * np.median(pdist(Z_tilde[:,:(Z_tilde.shape[1]-1)]))**2)
         
-    """ main
-    """
     Kg = SA_GRBF(Z, gamma_g)
     KQ = SA_GRBF(Z_tilde, gamma_q)
-
+    # centeralization, p11
+#     ZTstar = np.mean(Z_tilde, 0)
+#     KQ = KQ - GRBF(Z_tilde, ZTstar.reshape(1, -1), gamma_q) - GRBF(ZTstar.reshape(1, -1), 
+#                                                                    Z_tilde, gamma_q) - GRBF(ZTstar.reshape(1, -1), ZTstar.reshape(1, -1), gamma_q)[0][0]
+    
     ## Idnetity vec/mat
     C = np.hstack((-identity(T),identity(T)))       
     vec1, I = ones(T).reshape(-1,1), identity(T)
@@ -407,38 +388,22 @@ def computeQV_basic(tuples_i, R, penalty, spatial = True, mean_field = True,
     alpha = alpha_eta[:(len(alpha_eta) - 1)]
     Vi = eta = alpha_eta[-1]
     
-    """ CV
-    """
     if validation_set is not None: # used for Cross-validation
-#         print("validation_set")
-        A_set = set([a[1] for a in tuples_i])
-        Ta_set = set([a[4] for a in tuples_i])
         R = arr([a[2] for a in validation_set]) # dim?
         # not standardization yet.
-        if not spatial:
-            SA_t = np.array([np.concatenate((a[0], [a[1]])) for a in validation_set])            
-        else:
-            if mean_field: 
-                SA_t = np.array([np.concatenate((a[0], a[3], [a[1]], [a[4]])) for a in validation_set]) # [S, Ts, A, Ta]
-            else:
-                SA_t = np.array([np.concatenate((a[0], a[3], [a[1]], a[4])) for a in validation_set]) # [S, Ts, A, Ta]
+        SA_t = np.array([np.concatenate((a[0], a[3], [a[1]], [a[4]])) for a in validation_set]) # [S, Ts, A, Ta]
         T = SA_t.shape[0]
-
         QSA = alpha.T.dot(GRBF(Z_tilde, SA_t, gamma_q)).T
         QSA1 = 0 * QSA
-        # not non-MF yet
+        # not non-
         for action in A_set:
             for Ta in Ta_set:
-                if mean_field:
-                    SA_t1 = arr([[a[5], a[6], [action], [Ta] ] for a in validation_set]) # action
-                else:
-                    SA_t1 = arr([[a[5], a[6], [action], Ta ] for a in validation_set]) # action
+                SA_t1 = arr([[a[5], a[6], [action], [Ta] ] for a in validation_set]) # action
                 QSA1 += alpha.T.dot(GRBF(Z_tilde, SA_t, gamma_q)).T
-        bellman_errors = squeeze(R) + squeeze(QSA1) - eta - squeeze(QSA)
-        
+        bellman_errors = R + QSA1 - eta - QSA
         kernel = DotProduct() + WhiteKernel()
         gpr = GaussianProcessRegressor(kernel=kernel,
-            random_state=0, normalize_y = True).fit(SA_t, bellman_errors)
+            random_state=0).fit(SA_t, bellman_errors)
         return np.mean(gpr.predict(SA_t)**2)  
         
     else: # calculate the final value
@@ -447,3 +412,16 @@ def computeQV_basic(tuples_i, R, penalty, spatial = True, mean_field = True,
         return Qi_diff, Vi
 
 ##########################################################################################################################################################
+##########################################################################################################################################################
+    #- GRBF(Z, Zstar.reshape(1, -1), gamma_g) - GRBF(Zstar.reshape(1, -1), Z, gamma_g)  - GRBF(Zstar.reshape(1, -1), Zstar.reshape(1, -1), gamma_g)[0][0]
+
+
+    
+    # normalization: NA
+#     for i in range(4):
+#         sd = np.std(arr([a[i] for a in SASR_i]), 0)
+#         print("sd:", sd)
+#         for j in range(len(SASR_i)):
+#             SASR_i[j][i] /= sd
+#             if j == 0:
+#                 print(SASR_i[j][i])

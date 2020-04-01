@@ -1,0 +1,46 @@
+This is BibTeX, Version 0.99d (TeX Live 2016)
+Capacity: max_strings=35307, hash_size=35307, hash_prime=30011
+The top-level auxiliary file: suppcausalMARL.aux
+The style file: plain.bst
+Database file #1: CausalMARL.bib
+You've used 7 entries,
+            2118 wiz_defined-function locations,
+            548 strings with 5459 characters,
+and the built_in function-call counts, 2855 in all, are:
+= -- 292
+> -- 120
+< -- 2
++ -- 50
+- -- 40
+* -- 207
+:= -- 453
+add.period$ -- 22
+call.type$ -- 7
+change.case$ -- 41
+chr.to.int$ -- 0
+cite$ -- 7
+duplicate$ -- 103
+empty$ -- 224
+format.name$ -- 40
+if$ -- 603
+int.to.chr$ -- 0
+int.to.str$ -- 7
+missing$ -- 7
+newline$ -- 38
+num.names$ -- 14
+pop$ -- 39
+preamble$ -- 1
+purify$ -- 34
+quote$ -- 0
+skip$ -- 79
+stack$ -- 0
+substring$ -- 252
+swap$ -- 28
+text.length$ -- 2
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 28
+warning$ -- 0
+while$ -- 28
+width$ -- 8
+write$ -- 79

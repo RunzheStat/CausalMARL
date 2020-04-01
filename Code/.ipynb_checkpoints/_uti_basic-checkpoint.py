@@ -25,7 +25,7 @@ from sklearn import preprocessing as pre
 
 from termcolor import colored, cprint
 from matplotlib.pyplot import hist
-
+import pickle
 from sklearn.model_selection import GridSearchCV
 
 import os
@@ -146,8 +146,8 @@ def R2(y_true, y_pred):
 #     print("true_var:", true_var, "unexplained:", unexplained )
     return 1 - unexplained / true_var
 
-def print_progress(i, N):
-    if (i * 100 // N == 0):
+def print_progress(i, N, freq = 100):
+    if (i * freq // N == 0):
         print("#", end = "", flush = True)
 
         
@@ -157,3 +157,11 @@ def rangeofVec(v, precision = 2):
 
 def uv(v, precision = 3):
     return np.round([np.mean(v), np.std(v)], precision)
+
+
+# l = [[randn(3), randn(3)] for i in range(2)]
+# with open("test.txt", "wb") as fp:
+#     pickle.dump(l, fp)
+    
+# with open("test.txt", "rb") as fp:
+#     b = pickle.load(fp)
