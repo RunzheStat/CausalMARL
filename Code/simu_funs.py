@@ -37,9 +37,9 @@ def simu(pattern_seed = 1,  l = 5, T = 14 * 24, thre_range = [9, 10, 11, 12, 13]
         O_thre = thre_range[i]
         printG("O_threshold = " + str(thre_range[i]))
         if i == 0:#, n_r 
-            target_policy = simu_target_policy_pattern(l = l, u_O = u_O, threshold =  O_thre, print_flag = "all")
+            target_policy = simu_target_policy_pattern(l = l, u_O = u_O, threshold =  O_thre, print_flag = "None") # "all"
         else:
-            target_policy = simu_target_policy_pattern(l = l, u_O = u_O, threshold =  O_thre, print_flag = "policy_only")
+            target_policy = simu_target_policy_pattern(l = l, u_O = u_O, threshold =  O_thre, print_flag = "None") # "policy_only"
         target_policys.append(target_policy)
         
     # generate the adj for the grid
@@ -50,7 +50,7 @@ def simu(pattern_seed = 1,  l = 5, T = 14 * 24, thre_range = [9, 10, 11, 12, 13]
     def once(seed):
         return simu_once(seed = seed, l = l, T = T, time_dependent = time_dependent,  DGP_choice = DGP_choice,
                          u_O = u_O,  
-                         target_policys = target_policys, w_A = w_A, w_O = w_O, dim_S_plus_Ts = dim_S_plus_Ts, n_cores = n_cores, 
+                         target_policys = target_policys, w_A = w_A, w_O = w_O, dim_S_plus_Ts = dim_S_plus_Ts,  
                           penalty = penalty, penalty_NMF = penalty_NMF, 
                          n_layer = n_layer, sd_D = sd_D, sd_R = sd_R, sd_O = sd_O, 
                           w_hidden = w_hidden, Learning_rate = Learning_rate,  CV_QV = CV_QV, 
@@ -140,22 +140,26 @@ def simu(pattern_seed = 1,  l = 5, T = 14 * 24, thre_range = [9, 10, 11, 12, 13]
 #             mse = np.round(np.sqrt(bias**2 + std**2), 2)
 #             mse_rel = np.round(mse - mse[0], 2)
 #             bias = list(bias); std = list(std); mse = list(mse); mse_rel = list(mse_rel) 
-#             res = "   [DR/QV/IS]; [DR/QV/IS]_NO_MARL; [DR/QV/IS]_NO_MF; [V_behav]" + "\n" + "bias:" + str([bias[:3]]) + str([bias[3:6]]) + str([bias[6:9]]) + str([bias[9]]) + "\n" + \
-#             "std:" + str([std[:3]]) + str([std[3:6]]) + str([std[6:9]]) + str([std[9]])
+#             res = "   [DR/QV/IS]; [DR_NO_MARL, DR_NO_MF, V_behav]" + "\n" + \
+#             "bias:" + str([bias[:3]]) + str([bias[3:6]]) + "\n" + \
+#             "std:" + str([std[:3]]) + str([std[3:6]])
 #             print(res)
-#             print("MSE:" + str([mse[:3]]) + str([mse[3:6]]) + str([mse[6:9]]) + str([mse[9]])) 
-#             print("MSE(-DR):" + str([mse_rel[:3]]) + str([mse_rel[3:6]]) + str([mse_rel[6:9]]) + str([mse_rel[9]])) #  + "\n"
-
+#             print("MSE:" + str([mse[:3]]) + str([mse[3:6]])) 
+#             print("MSE(-DR):" + str([mse_rel[:3]]) + str([mse_rel[3:6]])) 
             
 #             if mse_rel[0] <= np.min(mse_rel[2:4]):
 #                 cprint("*", 'white', 'on_blue')
+
 #                 good_setting_flag += 1
-#             elif mse_rel[0] <= np.min(mse_rel[3]):     
-#                 cprint("**", "grey", "on_yellow")
-        cprint('==============',  attrs = ["bold"]); print("\n")
+        
+        """ ending 
+        """
+        cprint('==============',  attrs = ["bold"]); #print("\n") # why no print in paralel?
     if good_setting_flag == int(len(target_policys) ):#* 2
         printR("******************** THIS SETTING IS GOOD ********************")
-    
+        
+        
+        
     return Values_outputs_targets # a list (len-N_target) of list of [bias, std, MSE] (each is a vector). 
 
 
@@ -164,7 +168,7 @@ def simu_once(seed = 1, l = 3, T = 14 * 24, time_dependent = False, DGP_choice =
               sd_D = 3, sd_R = 0, sd_O = 1, 
               CV_QV = False, 
               u_O = None, 
-              dim_S_plus_Ts = 3 + 3, n_cores = n_cores, w_A = 1, w_O = .05, 
+              dim_S_plus_Ts = 3 + 3,  w_A = 1, w_O = .05, 
               penalty = [1, 1], penalty_NMF = None, 
               n_layer = 2, 
               w_hidden = 10, Learning_rate = 1e-4,  
@@ -189,19 +193,24 @@ def simu_once(seed = 1, l = 3, T = 14 * 24, time_dependent = False, DGP_choice =
                                      w_A = w_A, w_O = w_O)
     
     # OPE
+    a = now()
     value_targets = []
+    count = 0
     for target_policy in target_policys:
-        value_estimators = V_DR(data = data, pi = target_policy, behav = behav, 
-                                adj_mat = adj_mat, dim_S_plus_Ts = dim_S_plus_Ts, n_cores = n_cores, 
+        value_estimators = V_DR(data = data, pi = target_policy, behav = behav, simu_seed = seed,
+                                adj_mat = adj_mat, dim_S_plus_Ts = dim_S_plus_Ts, 
                              time_dependent = time_dependent,  simple = DGP_choice[3], 
                              Ts = Ts, Ta = Ta, penalty = penalty, penalty_NMF = penalty_NMF, 
                                 n_layer = n_layer, CV_QV = CV_QV, 
                             w_hidden = w_hidden, Learning_rate = Learning_rate,  
                             batch_size = batch_size, max_iteration = max_iteration, epsilon = epsilon, 
                              inner_parallel = inner_parallel)
+        count += 1
         value_targets.append(value_estimators)
-    if inner_parallel:
-        print("Rep", seed + 1 , "DONE", end = "; ")
+        if count % 2 == 0:
+            print("target", count ,"DONE!")
+    if inner_parallel and (seed + 1) % 5 == 0 :
+        print("Rep", seed + 1 , "DONE with time cost", (now() - a)//60, "mins", end = "; ")
     return value_targets
 
 ##########################################################################################################################################################
@@ -220,7 +229,7 @@ def MC_Value(l, T, time_dependent, target_policy, u_O = None, DGP_choice = None,
         V = np.mean(R)
         return V
     if inner_parallel:
-        Vs = parmap(oneTraj, range(reps), n_cores)
+        Vs = parmap(oneTraj, range(reps))
     else:
         Vs = rep_seeds(oneTraj, reps)
     # std among reps is small

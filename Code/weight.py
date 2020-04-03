@@ -1,6 +1,6 @@
 """
-This file is XXX. 
-The majority is adapted from the source code of the paper "Breaking the Curse of Horizon: Infinite-Horizon Off-Policy Estimation" on Github.
+This file is required for the function "getWeight", which is used to get density ratio for value estimation.
+The majority is adapted from the source code maintained on on Github for the paper "Breaking the Curse of Horizon: Infinite-Horizon Off-Policy Estimation".
     Date: 02/27/2020.
     URL: https://github.com/zt95/infinite-horizon-off-policy-estimation/blob/master/sumo/Density_ratio_continuous.py#L48
 """
@@ -306,10 +306,6 @@ class Density_Ratio_kernel(object):
         state_ratio = self.get_density_ratio(S_whole)
         action_ratio = PI1_whole / PI0_whole
         ratio_whole = state_ratio *  action_ratio
-        
-#         print(np.mean(state_ratio), np.std(state_ratio))
-#         print(np.mean(action_ratio), np.std(action_ratio))
-#         print(np.mean(ratio_whole), np.std(ratio_whole), "\n")
 
         if test_num > 0:
             print(DASH)

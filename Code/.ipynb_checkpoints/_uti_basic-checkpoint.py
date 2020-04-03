@@ -32,6 +32,11 @@ import os
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 
+
+from sklearn.model_selection import KFold
+from numpy import squeeze
+from numpy.linalg import solve
+
 np.set_printoptions(precision = 4)
 #############################################################################
 import time
@@ -61,7 +66,7 @@ def fun(f, q_in, q_out):
             break
         q_out.put((i, f(x)))
         
-def parmap(f, X, nprocs=multiprocessing.cpu_count()-2):
+def parmap(f, X, nprocs = multiprocessing.cpu_count()):#-2
     q_in = multiprocessing.Queue(1)
     q_out = multiprocessing.Queue()
 

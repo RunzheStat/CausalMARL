@@ -150,5 +150,5 @@ def simu_target_policy_pattern(l = 3, u_O = None, threshold = 12, print_flag = T
                 else:
                     print("0", end = " ")
             print("\n")
-        print("number of reward locations: ", sum(fixed_policy))
+    print("number of reward locations: ", sum(fixed_policy))
     return pi#, sum(fixed_policy)

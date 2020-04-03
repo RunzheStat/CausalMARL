@@ -4,7 +4,6 @@
 
 #%% packages
 from _uti_basic import *
-from scipy.linalg import sqrtm
 from sklearn.preprocessing import StandardScaler
 from sklearn.neighbors import KernelDensity
 
@@ -13,9 +12,6 @@ from itertools import combinations
 import operator
 import time
 now = time.time
-from sklearn.model_selection import KFold
-
-from numpy import squeeze
 from statsmodels.stats import proportion as prop
 import os, itertools
 from scipy.spatial.distance import pdist as pdist
@@ -26,8 +22,8 @@ from sklearn.gaussian_process.kernels import DotProduct, WhiteKernel
 from numpy.random import lognormal as rlogN
 
 from sklearn.metrics.pairwise import rbf_kernel as GRBF
-from numpy.linalg import solve
 from scipy.stats import binom
+
 
 ##########################################################################################################################################################
 
