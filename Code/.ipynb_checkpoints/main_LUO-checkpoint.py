@@ -24,7 +24,7 @@ Input:
 Output: 
     a vector of length #estimator flr the average cumulative reward
 """ 
-def V_DR(data, adj_mat, pi, behav, Ts, Ta, simu_seed = 0, 
+def V_DR(data, adj_mat, pi, behav, Ts, Ta, 
          penalty = [[1e-4, 1e-4]], penalty_NMF = None, 
          dim_S_plus_Ts = 3 + 3, 
             time_dependent = False, simple = False,
@@ -107,14 +107,6 @@ def V_DR(data, adj_mat, pi, behav, Ts, Ta, simu_seed = 0,
         DR_V_NMF = wi_NMF * (Ri + Qi_diff_NMF)
         IS_NMF = wi_NMF * Ri
             
-        """ Run partial for debug
-        """
-#         DR_V_NMF = QV_NMF = IS_NMF = 0
-#         DR_V = QV_V = IS_V = DR_V_NS = QV_NS = IS_NS = DR_V_NMF = IS_NMF = QV_NMF = DR2_V   = 0
-#         DR_V_NS = QV_NS = IS_NS = DR_V_NMF = IS_NMF = QV_NMF = 0
-#         DR_V  = IS_V = DR_V_NS = QV_NS = IS_NS = DR_V_NMF = IS_NMF = QV_NMF = DR2_V   = 0 # no QV
-        
-#         DR_V_NS  = IS_NS = DR_V_NMF = IS_NMF = QV_NMF = DR2_V   = 0
         
         """ ending
         """
@@ -123,9 +115,6 @@ def V_DR(data, adj_mat, pi, behav, Ts, Ta, simu_seed = 0,
                     np.mean(DR_V_NMF), #QV_NMF, np.mean(IS_NMF), 
 #                     np.mean(DR2_V), 
                     V_behav] 
-        
-        if not inner_parallel and simu_seed == 0 and (i + 1) % 5 == 1:
-            print(i + 1, "-th region DONE", "with time cost", (now() - a)//60, "mins")
         
         return values_i
     

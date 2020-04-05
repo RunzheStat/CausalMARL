@@ -207,7 +207,7 @@ def simu_once(seed = 1, l = 3, T = 14 * 24, time_dependent = False, DGP_choice =
                              inner_parallel = inner_parallel)
         count += 1
         value_targets.append(value_estimators)
-        if count % 2 == 0:
+        if seed == 0:
             print("target", count ,"DONE!")
     if inner_parallel and (seed + 1) % 5 == 0 :
         print("Rep", seed + 1 , "DONE with time cost", (now() - a)//60, "mins", end = "; ")
