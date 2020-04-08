@@ -13,21 +13,22 @@ from _utility import *
         adj_mat: binary adjacent matrix
         [[O, D, M], A, R]
 """
-def DG_once(seed = 1, l = 5, T = 14 * 48, time_dependent = False, DGP_choice = None, 
+def DG_once(seed = 1, l = 5, T = 14 * 48, t_func = None, DGP_choice = None, 
             w_A = 1, w_O = 1, sd_R  = 1, sd_D = 1, sd_O = 1, 
             u_O = None, 
            TARGET = False, target_policy = None, T_burn_in = 100):  
     """ prepare data (fixed)
     """
-    M_in_R, mean_reversion, poisO, simple, u_O_u_D = DGP_choice
+    M_in_R, mean_reversion, poisO, u_O_u_D = DGP_choice
     
     T = T + T_burn_in
     npseed(seed)
     N = l ** 2
-    adj_mat = getAdjGrid(l, simple = simple)
+    adj_mat = getAdjGrid(l)
     p_behav = 0.5
     # random errors for D and R
-    e_D = (rpoisson(1, (N, T)) - 1) * sd_D
+#     e_D = (rpoisson(1, (N, T)) - 1) * sd_D
+
     e_R = randn(N, T) * sd_R
     # initialization
     M = [runi(0, 1, N)] 

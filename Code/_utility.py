@@ -39,22 +39,14 @@ def adj2neigh(adj_mat):
     return neigh
 
 
-def Ta_disc(ta, simple = False):
+def Ta_disc(ta):
     # regardless of n_neigh
-    if not simple: 
-        if ta <= 2/8:
-            return 0
-        if ta <= 5/8:
-            return 1
-        else:
-            return 2
-    else: # may be do not need discrete
-        if ta <= 1/4:
-            return 0
-        if ta == 2/4:
-            return 1
-        else:
-            return 2
+    if ta <= 2/8:
+        return 0
+    if ta <= 5/8:
+        return 1
+    else:
+        return 2
 
 def den_b_disc(Ta, N_neigh): 
     # N_neigh is not a constant
@@ -65,11 +57,12 @@ def den_b_disc(Ta, N_neigh):
     return den
 
 ##########################################################################################################################################################
-def getAdjGrid(l, simple = False):
+def getAdjGrid(l):
     """
     simple: only 4 neigh
     
     """
+    simple = False
     N = l ** 2
     adj_mat = zeros((N, N))
     for i in range(N):
@@ -97,4 +90,5 @@ def getAdjGrid(l, simple = False):
     return adj_mat
 
 
-    
+def t_func_peri(t):
+    return t%48

@@ -13,22 +13,23 @@ from simu_DGP import *
 """
 def simu(pattern_seed = 1,  l = 5, T = 14 * 24, thre_range = [9, 10, 11, 12, 13], DGP_choice = None, # Setting - general
          OPE_rep_times = 20, n_cores = n_cores, inner_parallel = False,  # Parallel
-         time_dependent = False, # DGP / target
+         t_func = None, # DGP / target
          dim_S_plus_Ts = 3 + 3, epsilon = 1e-6,  # fixed
          sd_D = 3, sd_R = 0, sd_O = 1, sd_u_O = .3, # noises
          w_A = 1, w_O = .05, # Setting - spatial
          penalty = [.01, .01], penalty_NMF = None, CV_QV = False, # QV parameters
          n_layer = 2, w_hidden = 30, # NN structure
          Learning_rate = 1e-4, batch_size = 32, max_iteration = 1001, # NN training
-           # debug
-         file = None, print_flag_target = True # echo
+         with_MF = False, with_NO_MARL = True, 
+         file = None # echo
         ): 
     """ generate the order pattern (used by all rep, shared by b and pi)
     """
     
     npseed(pattern_seed)
-#     u_O = rlogN(2.4, sd_u_O, l**2) 
-    u_O = rlogN(4.6, sd_u_O, l**2)
+    u_O = rnorm(100, sd_u_O, l**2) 
+#     u_O = rlogN(4.6, sd_u_O, l**2)
+    
     print("max(u_O) = ", np.round(max(u_O), 1))
         
     # generate the corresponding target plicy
@@ -43,18 +44,19 @@ def simu(pattern_seed = 1,  l = 5, T = 14 * 24, thre_range = [9, 10, 11, 12, 13]
         target_policys.append(target_policy)
         
     # generate the adj for the grid
-    neigh = adj2neigh(getAdjGrid(l, simple = DGP_choice[3]))
+    neigh = adj2neigh(getAdjGrid(l))
     
     """ parallel
     """
     def once(seed):
-        return simu_once(seed = seed, l = l, T = T, time_dependent = time_dependent,  DGP_choice = DGP_choice,
+        return simu_once(seed = seed, l = l, T = T, t_func = t_func,  DGP_choice = DGP_choice,
                          u_O = u_O,  
                          target_policys = target_policys, w_A = w_A, w_O = w_O, dim_S_plus_Ts = dim_S_plus_Ts,  
                           penalty = penalty, penalty_NMF = penalty_NMF, 
                          n_layer = n_layer, sd_D = sd_D, sd_R = sd_R, sd_O = sd_O, 
                           w_hidden = w_hidden, Learning_rate = Learning_rate,  CV_QV = CV_QV, 
                           batch_size = batch_size, max_iteration = max_iteration, epsilon = epsilon, 
+                         with_MF = with_MF, with_NO_MARL = with_NO_MARL, 
                            inner_parallel = inner_parallel)
     if not inner_parallel:
         value_reps = parmap(once, range(OPE_rep_times), n_cores)
@@ -73,7 +75,7 @@ def simu(pattern_seed = 1,  l = 5, T = 14 * 24, thre_range = [9, 10, 11, 12, 13]
     Values_outputs_targets = []
     for i in range(len(target_policys)):
         target_policy = target_policys[i]
-        V_MC, std_V_MC = MC_Value(l = l, T = T, time_dependent = time_dependent,  DGP_choice = DGP_choice, 
+        V_MC, std_V_MC = MC_Value(l = l, T = T, t_func = t_func,  DGP_choice = DGP_choice, 
                                   u_O = u_O, sd_D = sd_D, sd_R = sd_R, sd_O = sd_O, w_A = w_A, w_O = w_O, 
                                   target_policy = target_policy, reps = 100, 
                                   inner_parallel = inner_parallel)
@@ -163,7 +165,7 @@ def simu(pattern_seed = 1,  l = 5, T = 14 * 24, thre_range = [9, 10, 11, 12, 13]
     return Values_outputs_targets # a list (len-N_target) of list of [bias, std, MSE] (each is a vector). 
 
 
-def simu_once(seed = 1, l = 3, T = 14 * 24, time_dependent = False, DGP_choice = None, 
+def simu_once(seed = 1, l = 3, T = 14 * 24, t_func = None, DGP_choice = None, 
               target_policys = None, 
               sd_D = 3, sd_R = 0, sd_O = 1, 
               CV_QV = False, 
@@ -173,6 +175,7 @@ def simu_once(seed = 1, l = 3, T = 14 * 24, time_dependent = False, DGP_choice =
               n_layer = 2, 
               w_hidden = 10, Learning_rate = 1e-4,  
               batch_size = 64, max_iteration = 1001, epsilon = 1e-3, 
+              with_MF = False, with_NO_MARL = True, 
                inner_parallel = False): 
     npseed(seed)
     N = l ** 2
@@ -183,12 +186,12 @@ def simu_once(seed = 1, l = 3, T = 14 * 24, time_dependent = False, DGP_choice =
     def Ts(S_neigh):
         return np.mean(S_neigh, 0)
     def Ta(A_neigh):
-        return Ta_disc(np.mean(A_neigh, 0), simple = DGP_choice[3])
+        return Ta_disc(np.mean(A_neigh, 0))
     
     # observed data following behav
     data, adj_mat, details = DG_once(seed = seed, l = l, T = T, DGP_choice = DGP_choice, 
                                      u_O = u_O, 
-                                     time_dependent = time_dependent,  
+                                     t_func = t_func,  
                                      sd_D = sd_D, sd_R = sd_R, sd_O = sd_O, 
                                      w_A = w_A, w_O = w_O)
     
@@ -196,32 +199,34 @@ def simu_once(seed = 1, l = 3, T = 14 * 24, time_dependent = False, DGP_choice =
     a = now()
     value_targets = []
     count = 0
+    n_target = len(target_policys)
     for target_policy in target_policys:
-        value_estimators = V_DR(data = data, pi = target_policy, behav = behav, simu_seed = seed,
+        value_estimators = V_DR(data = data, tp = target_policy, bp = behav, 
                                 adj_mat = adj_mat, dim_S_plus_Ts = dim_S_plus_Ts, 
-                             time_dependent = time_dependent,  simple = DGP_choice[3], 
+                             t_func = t_func, 
                              Ts = Ts, Ta = Ta, penalty = penalty, penalty_NMF = penalty_NMF, 
                                 n_layer = n_layer, CV_QV = CV_QV, 
-                            w_hidden = w_hidden, Learning_rate = Learning_rate,  
+                            w_hidden = w_hidden, lr = Learning_rate,  
                             batch_size = batch_size, max_iteration = max_iteration, epsilon = epsilon, 
+                                with_MF = with_MF, with_NO_MARL = with_NO_MARL, 
                              inner_parallel = inner_parallel)
         count += 1
         value_targets.append(value_estimators)
         if seed == 0:
-            print("target", count ,"DONE!")
+            print("target", count, "in", n_target, "DONE!")
     if inner_parallel and (seed + 1) % 5 == 0 :
-        print("Rep", seed + 1 , "DONE with time cost", (now() - a)//60, "mins", end = "; ")
+        print("Rep", seed + 1, "DONE") #  , "DONE with time cost", (now() - a), "mins", end = "; "
     return value_targets
 
 ##########################################################################################################################################################
 """ Apply MC to get the target value
 """
-def MC_Value(l, T, time_dependent, target_policy, u_O = None, DGP_choice = None, 
+def MC_Value(l, T, t_func, target_policy, u_O = None, DGP_choice = None, 
              sd_D =  3, sd_R = 0, sd_O = 1, 
              reps = 100, inner_parallel = False, w_A = 1, w_O = .01):
     def oneTraj(seed):
         # Off-policy evaluation with target_policy
-        data, adj_mat, details = DG_once(seed = seed, l = l, T = T, time_dependent = time_dependent, DGP_choice = DGP_choice, 
+        data, adj_mat, details = DG_once(seed = seed, l = l, T = T, t_func = t_func, DGP_choice = DGP_choice, 
                                           u_O = u_O, sd_O = sd_O, 
                                          TARGET = True, target_policy = target_policy, 
                                          sd_D = sd_D, sd_R = sd_R, w_A = w_A, w_O = w_O)
