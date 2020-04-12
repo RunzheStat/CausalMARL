@@ -35,13 +35,14 @@ Returns:
 """
 
 
+
 def V_DR(data, adj_mat, tp, bp, Ts, Ta, dim_S_plus_Ts = 3 + 3, 
          t_func = None, 
          penalty = [[1e-4], [1e-4]], penalty_NMF = [[1e-3], [1e-3]], CV_QV = False, 
          w_hidden = 30, lr = 1e-3,  n_layer = 2, 
          batch_size = 32, max_iteration = 1001,  epsilon = 1e-6, 
          inner_parallel = False, 
-         with_MF = True, with_NO_MARL = True): 
+         with_MF = True, with_NO_MARL = True, with_IS = True): 
 
     N, T = len(data), len(data[0]) - 1
     Qi_diffs, V, w_all, values = [], [], [], []
@@ -78,22 +79,26 @@ def V_DR(data, adj_mat, tp, bp, Ts, Ta, dim_S_plus_Ts = 3 + 3,
         Qi_diff, Vi = computeQV(tuples_i = tuples_i, R = Ri, n_neigh = n_neigh, 
                                 CV_QV = CV_QV, penalty_range = penalty, spatial = True)
         
-        r = getWeight(tuples_i, i, policy0 = bp[i], policy1 = tp[i], Ta_i = Ta_i, dim_S_plus_Ts = dim_S_plus_Ts,
-                       t_func = t_func, n_neigh = n_neigh,
-                      w_hidden = w_hidden, lr = lr,  n_layer = n_layer, 
-                      batch_size = batch_size, max_iteration = max_iteration,  
-                      epsilon = epsilon)
-        
-        wi = r[0]
-        wi /= np.mean(wi)
-        DR_V = wi * (Ri + Qi_diff)
+        if with_IS:
+            r = getWeight(tuples_i, i, policy0 = bp[i], policy1 = tp[i], Ta_i = Ta_i, dim_S_plus_Ts = dim_S_plus_Ts,
+                           t_func = t_func, n_neigh = n_neigh,
+                          w_hidden = w_hidden, lr = lr,  n_layer = n_layer, 
+                          batch_size = batch_size, max_iteration = max_iteration,  
+                          epsilon = epsilon)
+
+            wi = r[0]
+            wi /= np.mean(wi)
+            DR_V = wi * (Ri + Qi_diff)
         
         """ COMPETING METHODS
         1. with MARL 
         """
-        IS_V = wi * Ri
         QV_V = Vi[0] 
-        DR2_V = IS_V + QV_V - DR_V # the DR proposed by that paper
+        
+        if with_IS:
+            IS_V = wi * Ri
+        else:
+            IS_V  = DR_V = 0
         
         """ 2. DR_NO_MARL
         """
@@ -346,6 +351,8 @@ def computeQV_basic(tuples_i, R, penalty, spatial = True, mean_field = True,
                 I_A = np.multiply(I_A, I_Ta)
                 K = GRBF(Z[:,:(l - 2)], Z2[:,:(l - 2)], gamma) + nonsingular
                 return np.multiply(K, I_A)    
+#                 K = GRBF(Z, Z2, gamma) + nonsingular
+#                 return K
         else:
             Z = np.array([np.concatenate((a[0], a[3], [a[1]], a[4])) for a in tuples_i]) # T * p. [S, Ts, A, Ta]
             Zstar = np.array([np.concatenate((a[5], a[6], [a[7]], a[8])) for a in tuples_i])
@@ -391,17 +398,23 @@ def computeQV_basic(tuples_i, R, penalty, spatial = True, mean_field = True,
     Z_tilde = np.vstack((Z, Zstar))
     if spatial:
         if mean_field:
-            gamma_g = 1 / (2 * np.median(pdist(Z[:,:(Z.shape[1]-2)]))**2)
-            gamma_q = 1 / (2 * np.median(pdist(Z_tilde[:,:(Z_tilde.shape[1]-2)]))**2)
+            g_Z =  pdist(Z[:,:(Z.shape[1]-2)])
+            q_Z = pdist(Z_tilde[:,:(Z_tilde.shape[1]-2)])            
         else:
             T, l = Z.shape
             n_neigh = int((l - 4) / 4)
-            
-            gamma_g = 1 / (2 * np.median(pdist(Z[:, :(3 * (n_neigh + 1))]))**2)
-            gamma_q = 1 / (2 * np.median(pdist(Z_tilde[:, :(3 * (n_neigh + 1))]))**2)
+            g_Z = pdist(Z[:, :(3 * (n_neigh + 1))])
+            q_Z = pdist(Z_tilde[:, :(3 * (n_neigh + 1))])
+
     else:
-        gamma_g = 1 / (2 * np.median(pdist(Z[:,:(Z.shape[1]-1)]))**2)
-        gamma_q = 1 / (2 * np.median(pdist(Z_tilde[:,:(Z_tilde.shape[1]-1)]))**2)
+        g_Z = pdist(Z[:,:(Z.shape[1]-1)])
+        q_Z = pdist(Z_tilde[:,:(Z_tilde.shape[1]-1)])
+
+    gamma_g = 1 / (2 * (np.median(g_Z[g_Z != 0]))**2)
+    gamma_q = 1 / (2 * (np.median(q_Z[q_Z != 0]))**2)
+
+    if(np.isinf(gamma_g) or np.isinf(gamma_q)):
+        print(gamma_g, gamma_q)
         
     """ main
     """
@@ -420,15 +433,22 @@ def computeQV_basic(tuples_i, R, penalty, spatial = True, mean_field = True,
     left = (ECKQ1.T.dot(ECKQ1) + np.vstack((np.hstack((T * lam * KQ, zeros((2 * T, 1)))), zeros((1, 2 * T + 1))))) # Left part of (\hat{\alpha}, \hat{\eta})
     right = ECKQ1.T.dot(Kg.dot(solve(E_right_bef_inverse, R))) # Right part of (\hat{\alpha}, \hat{\eta})
     if validation_set is not None:
-        alpha_eta = np.linalg.lstsq(left, np.expand_dims(right,1))[0]
+        alpha_eta = -np.linalg.lstsq(left, np.expand_dims(right,1))[0]
     else:
         alpha_eta = -solve(left, np.expand_dims(right,1)) 
     alpha = alpha_eta[:(len(alpha_eta) - 1)]
     Vi = eta = alpha_eta[-1]
     
-    """ validation
+    """ NOT validation
     """
-    if validation_set is not None: # used for Cross-validation
+    if validation_set is None:
+        Qvalues = alpha.T.dot(KQ)
+        Qi_diff = Qvalues[0, T:] - Qvalues[0, :T] # Q^* - Q
+        return Qi_diff, Vi
+    
+    else: # used for Cross-validation
+        """ validation
+        """
         A_set = set([a[1] for a in tuples_i])
         Ta_set = np.unique(arr([a[4] for a in tuples_i]), axis=0)
         R = arr([a[2] for a in validation_set]) # dim?
@@ -471,9 +491,3 @@ def computeQV_basic(tuples_i, R, penalty, spatial = True, mean_field = True,
         gpr = GaussianProcessRegressor(kernel=kernel,
             random_state=0, normalize_y = True).fit(SA_t, bellman_errors)
         return np.mean(gpr.predict(SA_t)**2)
-#     """ not validation
-#     """   
-    else: # calculate the final value
-        Qvalues = alpha.T.dot(KQ)
-        Qi_diff = Qvalues[0, T:] - Qvalues[0, :T] # Q^* - Q
-        return Qi_diff, Vi

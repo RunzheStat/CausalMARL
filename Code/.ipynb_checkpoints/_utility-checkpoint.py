@@ -24,6 +24,8 @@ from numpy.random import lognormal as rlogN
 from sklearn.metrics.pairwise import rbf_kernel as GRBF
 from scipy.stats import binom
 
+simple = False
+# simple = True
 
 ##########################################################################################################################################################
 
@@ -41,12 +43,21 @@ def adj2neigh(adj_mat):
 
 def Ta_disc(ta):
     # regardless of n_neigh
-    if ta <= 2/8:
-        return 0
-    if ta <= 5/8:
-        return 1
+    if simple:
+        if ta <= 1/4:
+            return 0
+        if ta == 2/4:
+            return 1
+        else:
+            return 2
+#         return ta
     else:
-        return 2
+        if ta <= 2/8:
+            return 0
+        if ta <= 5/8:
+            return 1
+        else:
+            return 2
 
 def den_b_disc(Ta, N_neigh): 
     # N_neigh is not a constant
@@ -62,7 +73,6 @@ def getAdjGrid(l):
     simple: only 4 neigh
     
     """
-    simple = False
     N = l ** 2
     adj_mat = zeros((N, N))
     for i in range(N):

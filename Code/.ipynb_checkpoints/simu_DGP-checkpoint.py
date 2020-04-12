@@ -13,14 +13,16 @@ from _utility import *
         adj_mat: binary adjacent matrix
         [[O, D, M], A, R]
 """
-def DG_once(seed = 1, l = 5, T = 14 * 48, t_func = None, DGP_choice = None, 
+def DG_once(seed = 1, l = 5, T = 14 * 48, t_func = None, u_O_u_D = None, 
             w_A = 1, w_O = 1, sd_R  = 1, sd_D = 1, sd_O = 1, 
             u_O = None, 
            TARGET = False, target_policy = None, T_burn_in = 100):  
     """ prepare data (fixed)
     """
-    M_in_R, mean_reversion, poisO, u_O_u_D = DGP_choice
+    M_in_R  = True
+    u_O_u_D = u_O_u_D
     
+    poisO = True
     T = T + T_burn_in
     npseed(seed)
     N = l ** 2
@@ -34,18 +36,18 @@ def DG_once(seed = 1, l = 5, T = 14 * 48, t_func = None, DGP_choice = None,
     M = [runi(0, 1, N)] 
     R = []
     
-    """ TUNE
-    """
     # weight in the definition of mismatch
 
     w_M = 0.5    # 0.8
 
     # O: the pattern (spatial distribution) of orders
+    """ TUNE
+    """
     if poisO == True:
         O = rpoisson(u_O, (T, N)).T    
-    else:
-        O = np.repeat(u_O, T).reshape(N, T) +  (rpoisson(sd_O, (N, T)) - sd_O) #randn(N,T) #/ 10
-        O[O < 0] = 0
+#     else:
+#         O = np.repeat(u_O, T).reshape(N, T) +  (rpoisson(sd_O, (N, T)) - sd_O) #randn(N,T) #/ 10
+#         O[O < 0] = 0
 
     # Actions
     if TARGET: # target. fixed. 
@@ -54,6 +56,8 @@ def DG_once(seed = 1, l = 5, T = 14 * 48, t_func = None, DGP_choice = None,
         A = rbin(1, p_behav, (N, T))
     
     # D: initial is the same with driver. then attract by the A and O. burn-in.
+    """ TUNE
+    """
     u_D = np.mean(u_O) - u_O_u_D
     D = [arr([u_D for i in range(N)])]
     
@@ -64,15 +68,21 @@ def DG_once(seed = 1, l = 5, T = 14 * 48, t_func = None, DGP_choice = None,
         """ Drivers
         """
         ## attractions
-        Attr_OD = w_O * (squeeze(O[:, t - 1]) / (1 + squeeze(D[t - 1])))
+        """ TUNE
+        """
+#         Attr_OD = w_O * (squeeze(O[:, t - 1]) / (1 + squeeze(D[t - 1])))
+        Attr_OD = w_O * (squeeze(O[:, t - 1]) / (squeeze(D[t - 1])))
         Attr = np.exp(w_A * A[:, t - 1]) + squeeze(Attr_OD) ## * at first
+        
+        
+#         print(uv(np.exp(w_A * A[:, t - 1])), uv(squeeze(Attr_OD)), max(squeeze(Attr_OD)))
+        
         Attr_mat = np.repeat(Attr, N).reshape(N, N)
         Attr_adj = np.multiply(Attr_mat, adj_mat)
         Attr_neigh = np.sum(Attr_adj, 0)
 
         D_t = squeeze(Attr_adj.dot((D[t - 1] / squeeze(Attr_neigh)).reshape(-1, 1)))
-        if mean_reversion:
-            D_t = (D_t + u_D) / 2
+
         D.append(D_t)
         O_t = O[:, t] 
         
