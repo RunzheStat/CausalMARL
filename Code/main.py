@@ -276,6 +276,9 @@ Returns:
     Vi: \hat{V}_{i, pi}
     Qi_diff: a vector (len-T) of Q^pi(tp) - Q^pi(bp)
 """
+global count
+count = 0
+
 def computeQV(tuples_i, R, n_neigh = None, 
               spatial = True, mean_field = True, 
               CV_QV = False,
@@ -304,7 +307,10 @@ def computeQV(tuples_i, R, n_neigh = None,
                 if Bellman_error < min_Bellman_error:
                     min_Bellman_error = Bellman_error
                     optimal_penalty = [mu, lam]
-#         print(spatial, mean_field, optimal_penalty, min_Bellman_error)
+#         global count
+#         count += 1
+#         if count % 20 == 0:
+#             print(spatial, mean_field, optimal_penalty, min_Bellman_error)
         return computeQV_basic(tuples_i = tuples_i, R = R, penalty = optimal_penalty,
                                spatial = spatial, mean_field = mean_field)
                     

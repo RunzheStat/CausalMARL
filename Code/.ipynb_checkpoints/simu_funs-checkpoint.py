@@ -12,7 +12,7 @@ from simu_DGP import *
 """ Generate a pattern and four target policy (also one no treatment policy) and run the simu_once for OPE_rep_times times.
 """
 def simu(pattern_seed = 1,  l = 5, T = 14 * 24, thre_range = [9, 10, 11, 12, 13], u_O_u_D = None, # Setting - general
-         OPE_rep_times = 20, n_cores = n_cores, inner_parallel = False,  # Parallel
+         OPE_rep_times = 20, n_cores = n_cores, inner_parallel = False, full_parallel = False,  # Parallel
          t_func = None, # DGP / target
          dim_S_plus_Ts = 3 + 3, epsilon = 1e-6,  # fixed
          sd_D = 3, sd_R = 0, sd_O = 1, sd_u_O = .3, # noises
@@ -28,18 +28,39 @@ def simu(pattern_seed = 1,  l = 5, T = 14 * 24, thre_range = [9, 10, 11, 12, 13]
     
     """ TUNE
     """
-    npseed(pattern_seed)
-    u_O = rnorm(100, sd_u_O, l**2)  # u_O = rlogN(4.6, sd_u_O, l**2)
+    if pattern_seed is None: # fixed
+        u_O = [[80 for j in range(5)] for i in range(5)]
+        u_O[1][1] = u_O[1][3] = u_O[3][1] = u_O[3][3] = 150
+        u_O[2][2] = 200
+        a = u_O[0]
+        for i in range(1,5):
+            a += u_O[i]
+        u_O = a
+    elif pattern_seed == 0:
+        u_O = [[80 for j in range(5)] for i in range(5)]
+        for i in [0, 2, 4]:
+            for j in [0, 2, 4]:
+                u_O[i][j] = 100
+        u_O[1][1] = u_O[1][3] = u_O[3][1] = u_O[3][3] = 120
+        u_O[2][2] = 150
+        a = u_O[0]
+        for i in range(1,5):
+            a += u_O[i]
+        u_O = a
+    else:
+        npseed(pattern_seed)
+        u_O = rnorm(100, sd_u_O, l**2)  # u_O = rlogN(4.6, sd_u_O, l**2)
     
     print("max(u_O) = ", np.round(max(u_O), 1))
         
     # generate the corresponding target plicy
     target_policys = []
-    for i in range(len(thre_range)):
+    n_tp = len(thre_range)
+    for i in range(n_tp):
         O_thre = thre_range[i]
         printG("O_threshold = " + str(thre_range[i]))
         if i == 0:#, n_r 
-            target_policy = simu_target_policy_pattern(l = l, u_O = u_O, threshold =  O_thre, print_flag = "None") # "all"
+            target_policy = simu_target_policy_pattern(l = l, u_O = u_O, threshold =  O_thre, print_flag = "all") # "all"
         else:
             target_policy = simu_target_policy_pattern(l = l, u_O = u_O, threshold =  O_thre, print_flag = "None") # "policy_only"
         target_policys.append(target_policy)
@@ -49,24 +70,42 @@ def simu(pattern_seed = 1,  l = 5, T = 14 * 24, thre_range = [9, 10, 11, 12, 13]
     
     """ parallel
     """
-    def once(seed):
-        return simu_once(seed = seed, l = l, T = T, t_func = t_func,  u_O_u_D = u_O_u_D,
-                         u_O = u_O,  
-                         target_policys = target_policys, w_A = w_A, w_O = w_O, dim_S_plus_Ts = dim_S_plus_Ts,  
-                          penalty = penalty, penalty_NMF = penalty_NMF, 
-                         n_layer = n_layer, sd_D = sd_D, sd_R = sd_R, sd_O = sd_O, 
-                          w_hidden = w_hidden, Learning_rate = Learning_rate,  CV_QV = CV_QV, 
-                          batch_size = batch_size, max_iteration = max_iteration, epsilon = epsilon, 
-                         with_MF = with_MF, with_NO_MARL = with_NO_MARL, with_IS = with_IS, 
-                           inner_parallel = inner_parallel)
-    if not inner_parallel:
-        value_reps = parmap(once, range(OPE_rep_times), n_cores)
+    if full_parallel:
+        # []_tp_1, ..., []_tp_n
+        def once(seed):
+            return simu_once(seed = seed % OPE_rep_times, l = l, T = T, t_func = t_func,  u_O_u_D = u_O_u_D,
+                             u_O = u_O,  
+                             target_policys = [target_policys[seed // OPE_rep_times]], w_A = w_A, w_O = w_O, dim_S_plus_Ts = dim_S_plus_Ts,  
+                              penalty = penalty, penalty_NMF = penalty_NMF, 
+                             n_layer = n_layer, sd_D = sd_D, sd_R = sd_R, sd_O = sd_O, 
+                              w_hidden = w_hidden, Learning_rate = Learning_rate,  CV_QV = CV_QV, 
+                              batch_size = batch_size, max_iteration = max_iteration, epsilon = epsilon, 
+                             with_MF = with_MF, with_NO_MARL = with_NO_MARL, with_IS = with_IS, 
+                               inner_parallel = inner_parallel)
+        value_reps = parmap(once, range(OPE_rep_times * n_tp), n_cores)
+        value_targets = []
+        for i in range(len(target_policys)):
+            value_targets.append([value[0] for value in value_reps[(i * OPE_rep_times):((i + 1) * OPE_rep_times)]])
+        
     else:
-        value_reps = rep_seeds(once, OPE_rep_times)
-    
-    value_targets = []
-    for i in range(len(target_policys)):
-        value_targets.append([r[i] for r in value_reps])
+        def once(seed):
+            return simu_once(seed = seed, l = l, T = T, t_func = t_func,  u_O_u_D = u_O_u_D,
+                             u_O = u_O,  
+                             target_policys = target_policys, w_A = w_A, w_O = w_O, dim_S_plus_Ts = dim_S_plus_Ts,  
+                              penalty = penalty, penalty_NMF = penalty_NMF, 
+                             n_layer = n_layer, sd_D = sd_D, sd_R = sd_R, sd_O = sd_O, 
+                              w_hidden = w_hidden, Learning_rate = Learning_rate,  CV_QV = CV_QV, 
+                              batch_size = batch_size, max_iteration = max_iteration, epsilon = epsilon, 
+                             with_MF = with_MF, with_NO_MARL = with_NO_MARL, with_IS = with_IS, 
+                               inner_parallel = inner_parallel)
+        if not inner_parallel:
+            value_reps = parmap(once, range(OPE_rep_times), n_cores)
+        else:
+            value_reps = rep_seeds(once, OPE_rep_times)
+
+        value_targets = []
+        for i in range(len(target_policys)):
+            value_targets.append([r[i] for r in value_reps])
     
     """ MC-based average reward following the target
     """

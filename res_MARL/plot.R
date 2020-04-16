@@ -8,63 +8,31 @@ library(readr)
 res = list()
 
 y_var = "MSE"
-# y_var = "Bias"
+# y_var = "bias"
 # y_var = "std"
 
+trend = "sd_R"
+# trend = "day"
+# trend = "Time"
 
-path_plot = "/Users/mac/Google Drive/CausalMARL/res_MARL/2_sd15_T/"
-# path_plot = "/Users/mac/Desktop/vary_T/try/"
-n_axis = 8
 
-for (i in 2:n_axis) {# x-axis
-  path = paste(sep = "", path_plot, "res_sd_MSE", i, ".txt")
-  # path = paste(sep = "", path_plot, "res_sd_bias", i, ".txt")
-  # path = paste(sep = "", path_plot, "res_sd_std", i, ".txt") #  metric,
+path_plot = "/Users/mac/Desktop/"
+
+for (i in 1:n_axis) {# x-axis
+  path = paste(sep = "", path_plot, "res_sd_", y_var, i, ".txt")
   res_1 <- read_csv(path,
                     col_names = FALSE)
-  
-  # res_1 = res_1[c(2,4,5,7),]
   # res_1 = res_1[c(3,4,6,7),]
-  res[[i-1]] = abs(res_1)
+  res[[i]] = abs(res_1)
 }
 
-# for (i in 1:n_axis) {# x-axis
-#   # path = paste(sep = "", path_plot, "res_sd_MSE", i, ".txt")
-#   # path = paste(sep = "", path_plot, "res_sd_bias", i, ".txt")
-#   path = paste(sep = "", path_plot, "res_sd_std", i, ".txt") #  metric,
-#   res_1 <- read_csv(path,
-#                     col_names = FALSE)
-#   
-#   # res_1 = res_1[c(2,4,5,7),]
-#   # res_1 = res_1[c(3,4,6,7),]
-#   res[[i]] = abs(res_1)
-# }
-
-# Targets -----------------------------------------------------------------
+# Targets / Axis-----------------------------------------------------------------
 
 target_num = 4
-# threshold_levels = c(95, 100, 105,  110)
-# threshold_levels = c(80, 90, 100, 110)
-
-# threshold_levels = c(85, 95, 105, 115)
-# threshold_levels = c(75, 80, 85, 90, 100, 105, 110, 120)
-
 threshold_levels = c(100, 105, 110, 115)
 
-# Axis --------------------------------------------------------------------
-# trend = "sd_R"
-# trend = "day"
-trend = "Time"
-
+n_axis = 3
 # setting_range = seq(3,9,2)
-setting_range = seq(2,8,1)
-# setting_range = c(4, 6, 8, 10, 12)
-# setting_range = c(0, 5, 10, 15)
-# setting_range = c(0, 5, 10, 15, 20, 25)
-# setting_range = seq(0, 50, 10)
-
-# setting_range = seq(0, 25, 5)
-# setting_range = seq(4,14,2)
 
 # Competing ----------------------------------------------------------------
 
@@ -72,11 +40,6 @@ with_Naive_average = T
 with_QV = F
 
 # Setting-fixed -----------------------------------------------------------
-
-
-
-
-
 
 data_targets = list()
 
@@ -126,9 +89,6 @@ for (target in 1:target_num) {
 
 # plotting ----------------------------------------------------------------
 
-# threshold_levels = c(95, 105, 120)#seq(80,110,10)
-
-
 gg_one_target <-function(dat, threshold, x_axis = T, y_axis = T){
   n_est = length(levels(unique(data_targets[[l]][,2])))
   if (trend == "sd_R") {
@@ -170,7 +130,6 @@ gg_one_target <-function(dat, threshold, x_axis = T, y_axis = T){
   
   return(g)
 }
-# xlim
 
 ggs = list()
 for (l in c(1:target_num)) {
@@ -178,7 +137,7 @@ for (l in c(1:target_num)) {
     theme(plot.margin = unit(c(0.1, 0.1, 0.1, -.1), "cm"))
 }
 
-g = ggarrange(ggs[[1]], ggs[[2]], ggs[[3]], ggs[[4]], # , ggs[[5]], ggs[[6]], ggs[[7]], ggs[[8]]
+g = ggarrange(ggs[[1]], ggs[[2]], ggs[[3]], ggs[[4]], #ggs[[5]], ggs[[6]], # ggs[[7]], ggs[[8]]
               ncol = 4, nrow = 1, 
               # legend = "none",
               common.legend = TRUE, legend="bottom",
@@ -186,21 +145,7 @@ g = ggarrange(ggs[[1]], ggs[[2]], ggs[[3]], ggs[[4]], # , ggs[[5]], ggs[[6]], gg
 
 g1 = annotate_figure(g,
                 left = text_grob(y_var, rot = 90, hjust = 0))
-
+# save
 print(g1)
-
-
-# save --------------------------------------------------------------------
-
-
-
-ggsave(
-  filename = paste(sep = "", "/Users/mac/Desktop/", y_var, ".png"), 
-  plot = g1,
-  path = NULL,
-  width = 6,
-  # height = 2,
-  height = 2.5,
-  units = c("in"),
-  dpi = 1000,
-)
+ggsave( filename = paste(sep = "", "/Users/mac/Desktop/", y_var, ".png"),  plot = g1,
+        width = 6, height = 2.5,  units = c("in"), dpi = 1000 )

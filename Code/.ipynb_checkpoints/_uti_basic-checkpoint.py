@@ -59,6 +59,9 @@ from multiprocessing import Pool
 import multiprocessing
 n_cores = multiprocessing.cpu_count()
 
+def mute():
+    sys.stdout = open(os.devnull, 'w')    
+
 def fun(f, q_in, q_out):
     while True:
         i, x = q_in.get()
