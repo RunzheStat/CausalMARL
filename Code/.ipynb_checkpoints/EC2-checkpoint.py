@@ -1,11 +1,11 @@
 # export openblas_num_threads=1; export OMP_NUM_THREADS=1; python EC2.py
 from _uti_basic import * 
-aim = "sd_u_O_20_full_sd"
+aim = "final_sd_more"
 
 ############ Parallels ############
-rep_times = n_cores
+# rep_times = n_cores
 # rep_times = 16
-# rep_times = 96
+rep_times = 96
 
 # region_parallel = True
 region_parallel = False
@@ -16,10 +16,10 @@ full_parallel = False
 
 ############ Setting ############
 pattern_seed = 2
-sd_u_O = 20
+sd_u_O = 25
 w_O = .5
 w_A = 1.5
-u_O_u_D_range = [10] 
+u_O_u_D_range = [15] 
 
 ############ TARGETS ############
 # thre_range = [100, 105, 110, 115]
@@ -29,7 +29,11 @@ u_O_u_D_range = [10]
 
 # thre_range = [100, 100.5, 105, 110, 110.5, 111]
 
-thre_range = [100, 105, 110]
+# thre_range = [100, 101, 102, 110, 113, 113.5] 
+
+thre_range = [100, 101, 105, 110]
+
+# thre_range = [100, 105, 110]
 # thre_range = [100, 105]
 # thre_range = [110, 115]
 # thre_range = [90, 95, 120]
@@ -40,10 +44,12 @@ thre_range = [100, 105, 110]
 # thre_range = [80, 90]
 
 ############ X-axis ############
-# sd_R_range = [5, 15, 25]
+sd_R_range = [5, 15, 25]
 # sd_R_range = [0, 15, 30, 45]
 # sd_R_range = [15]
-sd_R_range = [0, 5, 10, 15, 20, 25]
+# sd_R_range = [0, 15, 30]
+# sd_R_range = [0, 10, 20, 30]
+# sd_R_range = [15]
 # sd_R_range = [0, 20, 40]
 
 # sd_R_range = [15]
@@ -56,6 +62,7 @@ sd_R_range = [0, 5, 10, 15, 20, 25]
 # day_range = [1, 2]
 
 day_range = [7]
+# day_range = [2, 3, 4, 5, 6, 7, 8]
 # day_range = [8, 7, 6, 5, 4, 3, 2]
 
 ############ Competing ############

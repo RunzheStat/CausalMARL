@@ -5,6 +5,11 @@ library(latex2exp)
 library(readr)
 
 # Data --------------------------------------------------------------------
+
+
+
+
+# Data --------------------------------------------------------------------
 res = list()
 
 y_var = "MSE"
@@ -12,27 +17,34 @@ y_var = "MSE"
 # y_var = "std"
 
 trend = "sd_R"
-# trend = "day"
 # trend = "Time"
 
+path_plot = "/Users/mac/Google Drive/CausalMARL/res_MARL/temp_py/"
 
-path_plot = "/Users/mac/Desktop/"
+# for (i in 1:length(setting_range)) {# x-axis
+#   path = paste(sep = "", path_plot, "res_sd_", y_var, i, ".txt")
+#   res_1 <- read_csv(path,
+#                     col_names = FALSE)
+#   # res_1 = res_1[c(3,4,6,7),]
+#   res[[i]] = abs(res_1)
+# }
+# trend = "day"
 
-for (i in 1:n_axis) {# x-axis
-  path = paste(sep = "", path_plot, "res_sd_", y_var, i, ".txt")
-  res_1 <- read_csv(path,
-                    col_names = FALSE)
-  # res_1 = res_1[c(3,4,6,7),]
-  res[[i]] = abs(res_1)
+
+if (trend == "sd_R") {
+  res = readRDS("/Users/mac/Google Drive/CausalMARL/res_MARL/final/final_sd/final_sd.RDS")  
+  setting_range = seq(0, 30, 5)
+}else{
+  res = readRDS("/Users/mac/Google Drive/CausalMARL/res_MARL/final/final_T/final_T.RDS")
+  setting_range = c(2, 3, 4, 5, 6, 7, 8)
 }
 
-# Targets / Axis-----------------------------------------------------------------
+
+# saveRDS(res, "/Users/mac/Google Drive/CausalMARL/res_MARL/final/final_sd/final_sd.RDS")
 
 target_num = 4
-threshold_levels = c(100, 105, 110, 115)
+threshold_levels= c(9, 8, 7, 6)
 
-n_axis = 3
-# setting_range = seq(3,9,2)
 
 # Competing ----------------------------------------------------------------
 
@@ -89,7 +101,7 @@ for (target in 1:target_num) {
 
 # plotting ----------------------------------------------------------------
 
-gg_one_target <-function(dat, threshold, x_axis = T, y_axis = T){
+gg_one_target <-function(dat, threshold,  y_axis = T){
   n_est = length(levels(unique(data_targets[[l]][,2])))
   if (trend == "sd_R") {
     g = ggplot(data=dat, aes(x=sd_R, y=MSE, group = method, colour = method))
@@ -102,31 +114,26 @@ gg_one_target <-function(dat, threshold, x_axis = T, y_axis = T){
   point_size = 1
   g = g + geom_line() +
     geom_point( size = point_size, aes(shape = method), fill="white")+ 
-    scale_shape_manual(values=c(1:n_est)) +
-    ggtitle(paste(sep = "", "c = ", threshold)) + # paste(title_prefix, name[l] ,sep = " ") # Threshold
+    scale_shape_manual(values=c(1:n_est))  + # paste(title_prefix, name[l] ,sep = " ") # Threshold
     theme(plot.title = element_text(hjust = 0.5))
- 
+  
+  if(trend =="sd_R")g = g + ggtitle(paste(sep = "", "K = ", threshold)) + theme(plot.title = element_text(size = 15)) # , face = "bold"
+  
   g = g + ylim(0, NA)
-   
-  # + 
-    # scale_x_continuous(breaks = seq(7, 11, 1)) + 
-    # scale_y_continuous(breaks = seq(0, 12, 1))
-  if (x_axis) {
-   
-    if (trend == "sd_R") {
+  
+  if (trend == "sd_R") {
       g = g + xlab( TeX('$\\sigma_R$'))
     }else if(trend == "day"){
       g = g + xlab("Number of Days")
     }else{
       g = g + xlab("T")
-    }
-  }
-  if (y_axis) {
-    g = g + ylab("MSE")
-  }else{
-    g = g + ylab(NULL) # ,axis.ticks.x=element_blank()
+      g = g + xlim(NA, 400)
+      # g = g + scale_x_continuous(breaks = seq(100, 400, 100))
   }
   
+  if (y_axis) {g = g + ylab("MSE")
+  }else{g = g + ylab(NULL) # ,axis.ticks.x=element_blank()
+  }
   
   return(g)
 }
@@ -137,15 +144,30 @@ for (l in c(1:target_num)) {
     theme(plot.margin = unit(c(0.1, 0.1, 0.1, -.1), "cm"))
 }
 
-g = ggarrange(ggs[[1]], ggs[[2]], ggs[[3]], ggs[[4]], #ggs[[5]], ggs[[6]], # ggs[[7]], ggs[[8]]
-              ncol = 4, nrow = 1, 
-              # legend = "none",
-              common.legend = TRUE, legend="bottom",
-              align = "v")# , ggs[[3]], ggs[[4]]
+if(trend =="sd_R"){
+  g = ggarrange(ggs[[1]], ggs[[2]], ggs[[3]], ggs[[4]], # ggs[[5]], ggs[[6]], # ggs[[7]], ggs[[8]]
+                ncol = 4, nrow = 1, 
+                legend = "none",
+                align = "v")# , ggs[[3]], ggs[[4]]
+}else{
+  g = ggarrange(ggs[[1]], ggs[[2]], ggs[[3]], ggs[[4]], # ggs[[5]], ggs[[6]], # ggs[[7]], ggs[[8]]
+                ncol = 4, nrow = 1, 
+                common.legend = TRUE, legend="bottom",
+                align = "v")# , ggs[[3]], ggs[[4]]
+}
 
-g1 = annotate_figure(g,
-                left = text_grob(y_var, rot = 90, hjust = 0))
+
+g1 = annotate_figure(g, left = text_grob(y_var, rot = 90, hjust = 0))
 # save
 print(g1)
-ggsave( filename = paste(sep = "", "/Users/mac/Desktop/", y_var, ".png"),  plot = g1,
-        width = 6, height = 2.5,  units = c("in"), dpi = 1000 )
+
+if (trend == "sd_R") {
+  ggsave( filename = paste(sep = "", "/Users/mac/Desktop/", y_var, "_sd.png"),  plot = g1,
+          width = 6.5, 
+          height = 2.1,  units = c("in"), dpi = 1000 )
+}else{
+  ggsave( filename = paste(sep = "", "/Users/mac/Desktop/", y_var, "_T.png"),  plot = g1,
+          width = 6.5, 
+          height = 2.2,  units = c("in"), dpi = 1000 )
+}
+

@@ -51,7 +51,7 @@ def simu(pattern_seed = 1,  l = 5, T = 14 * 24, thre_range = [9, 10, 11, 12, 13]
         npseed(pattern_seed)
         u_O = rnorm(100, sd_u_O, l**2)  # u_O = rlogN(4.6, sd_u_O, l**2)
     
-    print("max(u_O) = ", np.round(max(u_O), 1))
+    print("max(u_O) = ", np.round(max(u_O), 1), "mean(u_O) = ", np.round(np.mean(u_O), 1))
         
     # generate the corresponding target plicy
     target_policys = []
