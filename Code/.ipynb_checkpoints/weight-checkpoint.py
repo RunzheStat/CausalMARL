@@ -169,13 +169,11 @@ class Density_Ratio_kernel(object):
     def train(self, SASR, policy0, policy1, print_flag, 
               batch_size, max_iteration,
               test_num = 0, 
-              Ta_i = None, 
               epsilon = 1e-3, only_state = False, 
               n_neigh = 8, spatial = True, mean_field = True):
         """ Train the NN to get theta^*
         Input:
             policy1(state, action) is its probability
-            
         """
         ########################### Preparing data ###########################
         npseed(0)
@@ -185,28 +183,28 @@ class Density_Ratio_kernel(object):
         PI0 = []
         REW = []
         for sasr in SASR:
-            for state, action, next_state, reward in sasr:
-                
+            for state, action, next_state, reward, pi_Sit in sasr:
                 if spatial: # p_{a|s} needs to consider the neigh (only for our behaviour cases)
                     Ta_tl = action[1]
                     A_tl = action[0]
                     if mean_field:
-                        pi1 = int(Ta_i == Ta_tl and policy1(s = None, random_choose = True) == A_tl)
+                        # print(int(state[0]), Ta_tl, pi_Sit, A_tl, "\n")
+                        pi1 = int(int(state[0]) == Ta_tl and pi_Sit == A_tl) # P_tp(a = obs_action | S)
                         PI1.append(pi1) # the target policy is deterministic
                         pi0 = den_b_disc(Ta_tl, n_neigh) * 0.5
                         PI0.append(pi0)
                         if pi0 == 0:
                             print([Ta_tl, n_neigh])
-                    else:
-                        pi1 = int(np.array_equal(Ta_i, Ta_tl) and policy1(s = None, random_choose = True) == A_tl)
+                    else:# not mean-field
+                        pi1 = int(np.array_equal(pi_Sit[1], Ta_tl) and pi_Sit[0] == A_tl)
                         PI1.append(pi1) # the target policy is deterministic
-                        pi0 = 0.5**(n_neigh + 1)
+                        pi0 = 0.5 ** (n_neigh + 1)
                         PI0.append(pi0)                            
                 else:#                     PI1.append(1)
-                    pi1 = int(policy1(s = None, random_choose = True) == action)
+                    pi1 = int(pi_Sit == action)
                     PI1.append(pi1)
-#                     print(int(policy1(s = None, random_choose = True)), action,"\n")
                     PI0.append(0.5) # purely random
+                    
                 S.append(state)
                 SN.append(next_state)
                 REW.append(reward) # not immediately required in DR
@@ -215,11 +213,16 @@ class Density_Ratio_kernel(object):
             print("PI0:", np.mean(PI0), np.std(PI0))
         ## Normalization
         S = np.array(S)
+        SN = np.array(SN)
         S_max = np.max(S, axis = 0)
         S_min = np.min(S, axis = 0)
-        S = (S - S_min)/(S_max - S_min)
-        SN = (np.array(SN) - S_min)/(S_max - S_min)
         
+        if spatial and mean_field:
+            S[:, 1:] = (S[:, 1:] - S_min[1:])/(S_max[1:] - S_min[1:])
+            SN[:, 1:] = (SN[:, 1:] - S_min[1:])/(S_max[1:] - S_min[1:])
+        else:
+            S = (S - S_min)/(S_max - S_min)
+            SN = (SN - S_min)/(S_max - S_min)
         
         ## Keep the original data for getting fitting results
         S_whole = np.array(S).copy()
@@ -305,6 +308,11 @@ class Density_Ratio_kernel(object):
                 
         state_ratio = self.get_density_ratio(S_whole)
         action_ratio = PI1_whole / PI0_whole
+#         if spatial and mean_field:
+#             print("state_ratio", state_ratio, "\n\n")
+#             print("action_ratio", action_ratio)
+        
+        
         ratio_whole = state_ratio *  action_ratio
 
         if test_num > 0:

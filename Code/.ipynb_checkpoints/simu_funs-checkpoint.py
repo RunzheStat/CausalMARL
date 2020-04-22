@@ -11,7 +11,7 @@ from simu_DGP import *
 
 """ Generate a pattern and four target policy (also one no treatment policy) and run the simu_once for OPE_rep_times times.
 """
-def simu(pattern_seed = 1,  l = 5, T = 14 * 24, thre_range = [9, 10, 11, 12, 13], u_O_u_D = None, # Setting - general
+def simu(pattern_seed = 1,  l = 5, T = 14 * 24, thre_range = [9, 10, 11, 12, 13], u_D = None, # Setting - general
          OPE_rep_times = 20, n_cores = n_cores, inner_parallel = False, full_parallel = False,  # Parallel
          t_func = None, # DGP / target
          dim_S_plus_Ts = 3 + 3, epsilon = 1e-6,  # fixed
@@ -73,7 +73,7 @@ def simu(pattern_seed = 1,  l = 5, T = 14 * 24, thre_range = [9, 10, 11, 12, 13]
     if full_parallel:
         # []_tp_1, ..., []_tp_n
         def once(seed):
-            return simu_once(seed = seed % OPE_rep_times, l = l, T = T, t_func = t_func,  u_O_u_D = u_O_u_D,
+            return simu_once(seed = seed % OPE_rep_times, l = l, T = T, t_func = t_func,  u_D = u_D,
                              u_O = u_O,  
                              target_policys = [target_policys[seed // OPE_rep_times]], w_A = w_A, w_O = w_O, dim_S_plus_Ts = dim_S_plus_Ts,  
                               penalty = penalty, penalty_NMF = penalty_NMF, 
@@ -89,7 +89,7 @@ def simu(pattern_seed = 1,  l = 5, T = 14 * 24, thre_range = [9, 10, 11, 12, 13]
         
     else:
         def once(seed):
-            return simu_once(seed = seed, l = l, T = T, t_func = t_func,  u_O_u_D = u_O_u_D,
+            return simu_once(seed = seed, l = l, T = T, t_func = t_func,  u_D = u_D,
                              u_O = u_O,  
                              target_policys = target_policys, w_A = w_A, w_O = w_O, dim_S_plus_Ts = dim_S_plus_Ts,  
                               penalty = penalty, penalty_NMF = penalty_NMF, 
@@ -105,19 +105,33 @@ def simu(pattern_seed = 1,  l = 5, T = 14 * 24, thre_range = [9, 10, 11, 12, 13]
 
         value_targets = []
         for i in range(len(target_policys)):
-            value_targets.append([r[i] for r in value_reps])
+            value_targets.append([r[i] for r in value_reps])    
     
     """ MC-based average reward following the target
+    value_targets: len-n_target of len-100 of len-n_est results
     """
     good_setting_flag = 0
     print(Dash)
     
+    def sd_mse_values(Vs, V_true):
+        """ calculate the std of "the mse estimates"
+        """
+        n = len(Vs)
+        temp = mean(Vs**4) - (mean(Vs**2))**2 + 4 * V_true ** 2 * var(Vs) - 4 * V_true * (mean(Vs**3) - mean(Vs**2) * mean(Vs))
+        return sqrt(temp) / np.sqrt(n)
+        # sp.stats.moment([1,2], moment = 4) central moment?
+    
+    def sd_mse_values_methods(V_OPE, V_MC):
+        sd_mse = []
+        for i in range(V_OPE.shape[1]):
+            sd_mse.append(sd_mse_values(V_OPE[:, i], V_MC))
+        return sd_mse
+
     Values_outputs_targets = []
     for i in range(len(target_policys)):
-        target_policy = target_policys[i]
-        V_MC, std_V_MC = MC_Value(l = l, T = T, t_func = t_func,  u_O_u_D = u_O_u_D, 
+        V_MC, std_V_MC = MC_Value(l = l, T = T, t_func = t_func,  u_D = u_D, 
                                   u_O = u_O, sd_D = sd_D, sd_R = sd_R, sd_O = sd_O, w_A = w_A, w_O = w_O, 
-                                  target_policy = target_policy, reps = 100, 
+                                  target_policy = target_policys[i], reps = 100, 
                                   inner_parallel = inner_parallel)
         V_OPE = value_targets[i]
         
@@ -128,72 +142,37 @@ def simu(pattern_seed = 1,  l = 5, T = 14 * 24, thre_range = [9, 10, 11, 12, 13]
         printG("O_threshold = " + str(thre_range[i]))
         printR("MC for this TARGET:" + str([V_MC, std_V_MC]))
         
-        
-        
-        
         """ Value
         """
-#         bias = np.round(np.abs(np.mean(V_OPE, 0) - V_MC), 2)
         bias = np.round(np.nanmean(V_OPE, 0) - V_MC, 2) # nan
         std = np.round(np.nanstd(V_OPE, 0), 2)
-        mse = np.round(np.sqrt(bias**2 + std**2), 2)
-        mse_rel = np.round(mse - mse[0], 2)
-        bias = list(bias); std = list(std); mse = list(mse); mse_rel = list(mse_rel) 
+        MSE = np.round(bias**2 + std**2, 2)
+        RMSE = np.round(np.sqrt(bias**2 + std**2), 2)
+        mse_rel = np.round(MSE - MSE[0], 2)
+        sd_MSE = np.round(sd_mse_values_methods(arr(V_OPE), V_MC), 2)
+        
+        bias = list(bias); std = list(std); MSE = list(MSE); mse_rel = list(mse_rel)
         res = "   [DR/QV/IS]; [DR_NO_MARL, DR_NO_MF, V_behav]" + "\n" + \
         "bias:" + str([bias[:3]]) + str([bias[3:6]]) + "\n" + \
-        "std:" + str([std[:3]]) + str([std[3:6]])
+        "std:" + str([std[:3]]) + str([std[3:6]]) + "\n" + \
+        "sd_MSE:" + str([sd_MSE[:3]]) + str([sd_MSE[3:6]])
+        
         print(res)
-        printB("MSE:" + str([mse[:3]]) + str([mse[3:6]])) 
-        printB("MSE(-DR):" + str([mse_rel[:3]]) + str([mse_rel[3:6]])) 
+        printB("MSE:" + str([MSE[:3]]) + str([MSE[3:6]])) 
+        printB("RMSE(-DR):" + str([mse_rel[:3]]) + str([mse_rel[3:6]])) 
 
         if mse_rel[0] <= np.min(mse_rel[2:4]):
             cprint("***", 'white', 'on_red')
             good_setting_flag += 1
         elif mse_rel[0] <= np.min(mse_rel[3]):  
             cprint("**", "grey", "on_yellow")
-
-#         res = "   [DR/QV/IS]; [DR/QV/IS]_NO_MARL; [DR/QV/IS]_NO_MF; [V_behav]" + "\n" + "bias:" + str([bias[:3]]) + str([bias[3:6]]) + str([bias[6:9]]) + str([bias[9]]) + "\n" + \
-#         "std:" + str([std[:3]]) + str([std[3:6]]) + str([std[6:9]]) + str([std[9]])
-#         print(res)
-#         printB("MSE:" + str([mse[:3]]) + str([mse[3:6]]) + str([mse[6:9]]) + str([mse[9]]))
-#         printB("MSE(-DR):" + str([mse_rel[:3]]) + str([mse_rel[3:6]]) + str([mse_rel[6:9]]) + str([mse_rel[9]])) # + "\n"
-
-#         if mse_rel[0] <= np.min(mse_rel[2:4]):
-#             cprint("***", 'white', 'on_red')
-#             good_setting_flag += 1
-#         elif mse_rel[0] <= np.min(mse_rel[3]):  
-#             cprint("**", "grey", "on_yellow")
         
-        Values_output = [arr(bias), arr(std), arr(mse)]
+        Values_output = [arr(bias), arr(std), arr(MSE), arr(RMSE), sd_MSE, V_OPE, V_MC] # V_OPE = len-100 of len-n_est results
         Values_outputs_targets.append(Values_output)
         
         """ ATE 
         """
-#         if i == 0:
-#             V_0 = V_OPE #  rep * n_estimates
-#             MC_0 = V_MC # a number
-#         else:  # 【bias, variance, MSE】 for 【\hat{V_target} - \hat{V}_0】
-#             ATE = arr(V_OPE) - V_0
-#             MC_ATE = V_MC - MC_0
-#             printR("MC-based ATE = " + str(round(MC_ATE, 2)))
-            
-#             bias = np.round(np.mean(ATE, 0) - MC_ATE, 2)
-#             std = np.round(np.std(ATE, 0), 2)
-#             mse = np.round(np.sqrt(bias**2 + std**2), 2)
-#             mse_rel = np.round(mse - mse[0], 2)
-#             bias = list(bias); std = list(std); mse = list(mse); mse_rel = list(mse_rel) 
-#             res = "   [DR/QV/IS]; [DR_NO_MARL, DR_NO_MF, V_behav]" + "\n" + \
-#             "bias:" + str([bias[:3]]) + str([bias[3:6]]) + "\n" + \
-#             "std:" + str([std[:3]]) + str([std[3:6]])
-#             print(res)
-#             print("MSE:" + str([mse[:3]]) + str([mse[3:6]])) 
-#             print("MSE(-DR):" + str([mse_rel[:3]]) + str([mse_rel[3:6]])) 
-            
-#             if mse_rel[0] <= np.min(mse_rel[2:4]):
-#                 cprint("*", 'white', 'on_blue')
-
-#                 good_setting_flag += 1
-        
+       
         """ ending 
         """
         cprint('==============',  attrs = ["bold"]); #print("\n") # why no print in paralel?
@@ -205,7 +184,7 @@ def simu(pattern_seed = 1,  l = 5, T = 14 * 24, thre_range = [9, 10, 11, 12, 13]
     return Values_outputs_targets # a list (len-N_target) of list of [bias, std, MSE] (each is a vector). 
 
 
-def simu_once(seed = 1, l = 3, T = 14 * 24, t_func = None, u_O_u_D = None, 
+def simu_once(seed = 1, l = 3, T = 14 * 24, t_func = None, u_D = None, 
               target_policys = None, 
               sd_D = 3, sd_R = 0, sd_O = 1, 
               CV_QV = False, 
@@ -217,6 +196,9 @@ def simu_once(seed = 1, l = 3, T = 14 * 24, t_func = None, u_O_u_D = None,
               batch_size = 64, max_iteration = 1001, epsilon = 1e-3, 
               with_MF = False, with_NO_MARL = True, with_IS  = True, 
                inner_parallel = False): 
+    """
+    Output: a len-n-target of len-est results
+    """
     npseed(seed)
     N = l ** 2
     def behav(s, a):
@@ -229,7 +211,7 @@ def simu_once(seed = 1, l = 3, T = 14 * 24, t_func = None, u_O_u_D = None,
         return Ta_disc(np.mean(A_neigh, 0))
     
     # observed data following behav
-    data, adj_mat, details = DG_once(seed = seed, l = l, T = T, u_O_u_D = u_O_u_D, 
+    data, adj_mat, details = DG_once(seed = seed, l = l, T = T, u_D = u_D, 
                                      u_O = u_O, 
                                      t_func = t_func,  
                                      sd_D = sd_D, sd_R = sd_R, sd_O = sd_O, 
@@ -261,12 +243,12 @@ def simu_once(seed = 1, l = 3, T = 14 * 24, t_func = None, u_O_u_D = None,
 ##########################################################################################################################################################
 """ Apply MC to get the target value
 """
-def MC_Value(l, T, t_func, target_policy, u_O = None, u_O_u_D = None, 
+def MC_Value(l, T, t_func, target_policy, u_O = None, u_D = None, 
              sd_D =  3, sd_R = 0, sd_O = 1, 
              reps = 100, inner_parallel = False, w_A = 1, w_O = .01):
     def oneTraj(seed):
         # Off-policy evaluation with target_policy
-        data, adj_mat, details = DG_once(seed = seed, l = l, T = T, t_func = t_func, u_O_u_D = u_O_u_D, 
+        data, adj_mat, details = DG_once(seed = seed, l = l, T = T, t_func = t_func, u_D = u_D, 
                                           u_O = u_O, sd_O = sd_O, 
                                          TARGET = True, target_policy = target_policy, 
                                          sd_D = sd_D, sd_R = sd_R, w_A = w_A, w_O = w_O)
@@ -280,3 +262,43 @@ def MC_Value(l, T, t_func, target_policy, u_O = None, u_O_u_D = None,
     # std among reps is small
     res = np.round([np.mean(Vs), np.std(Vs)], 3)  
     return res
+
+#         if i == 0:
+#             V_0 = V_OPE #  rep * n_estimates
+#             MC_0 = V_MC # a number
+#         else:  # 【bias, variance, MSE】 for 【\hat{V_target} - \hat{V}_0】
+#             ATE = arr(V_OPE) - V_0
+#             MC_ATE = V_MC - MC_0
+#             printR("MC-based ATE = " + str(round(MC_ATE, 2)))
+            
+#             bias = np.round(np.mean(ATE, 0) - MC_ATE, 2)
+#             std = np.round(np.std(ATE, 0), 2)
+#             mse = np.round(np.sqrt(bias**2 + std**2), 2)
+#             mse_rel = np.round(mse - mse[0], 2)
+#             bias = list(bias); std = list(std); mse = list(mse); mse_rel = list(mse_rel) 
+#             res = "   [DR/QV/IS]; [DR_NO_MARL, DR_NO_MF, V_behav]" + "\n" + \
+#             "bias:" + str([bias[:3]]) + str([bias[3:6]]) + "\n" + \
+#             "std:" + str([std[:3]]) + str([std[3:6]])
+#             print(res)
+#             print("MSE:" + str([mse[:3]]) + str([mse[3:6]])) 
+#             print("MSE(-DR):" + str([mse_rel[:3]]) + str([mse_rel[3:6]])) 
+            
+#             if mse_rel[0] <= np.min(mse_rel[2:4]):
+#                 cprint("*", 'white', 'on_blue')
+
+#                 good_setting_flag += 1
+ 
+    
+    
+
+#         res = "   [DR/QV/IS]; [DR/QV/IS]_NO_MARL; [DR/QV/IS]_NO_MF; [V_behav]" + "\n" + "bias:" + str([bias[:3]]) + str([bias[3:6]]) + str([bias[6:9]]) + str([bias[9]]) + "\n" + \
+#         "std:" + str([std[:3]]) + str([std[3:6]]) + str([std[6:9]]) + str([std[9]])
+#         print(res)
+#         printB("MSE:" + str([mse[:3]]) + str([mse[3:6]]) + str([mse[6:9]]) + str([mse[9]]))
+#         printB("MSE(-DR):" + str([mse_rel[:3]]) + str([mse_rel[3:6]]) + str([mse_rel[6:9]]) + str([mse_rel[9]])) # + "\n"
+
+#         if mse_rel[0] <= np.min(mse_rel[2:4]):
+#             cprint("***", 'white', 'on_red')
+#             good_setting_flag += 1
+#         elif mse_rel[0] <= np.min(mse_rel[3]):  
+#             cprint("**", "grey", "on_yellow")

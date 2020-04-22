@@ -12,35 +12,41 @@ library(readr)
 # Data --------------------------------------------------------------------
 res = list()
 
-y_var = "MSE"
+ y_var = "MSE"
 # y_var = "bias"
 # y_var = "std"
+# y_var = "sd_MSE"
 
-trend = "sd_R"
-# trend = "Time"
+# trend = "sd_R"
+trend = "Time"
+# trend = "day"
 
 path_plot = "/Users/mac/Google Drive/CausalMARL/res_MARL/temp_py/"
 
-# for (i in 1:length(setting_range)) {# x-axis
-#   path = paste(sep = "", path_plot, "res_sd_", y_var, i, ".txt")
-#   res_1 <- read_csv(path,
-#                     col_names = FALSE)
-#   # res_1 = res_1[c(3,4,6,7),]
-#   res[[i]] = abs(res_1)
-# }
-# trend = "day"
-
-
 if (trend == "sd_R") {
-  res = readRDS("/Users/mac/Google Drive/CausalMARL/res_MARL/final/final_sd/final_sd.RDS")  
   setting_range = seq(0, 30, 5)
 }else{
-  res = readRDS("/Users/mac/Google Drive/CausalMARL/res_MARL/final/final_T/final_T.RDS")
   setting_range = c(2, 3, 4, 5, 6, 7, 8)
 }
 
 
-# saveRDS(res, "/Users/mac/Google Drive/CausalMARL/res_MARL/final/final_sd/final_sd.RDS")
+for (i in 1:length(setting_range)) {# x-axis
+  path = paste(sep = "", path_plot, "res_T_", y_var, i, ".txt")
+  res_1 <- read_csv(path,
+                    col_names = FALSE)
+  # res_1 = res_1[c(3,4,6,7),]
+  res[[i]] = abs(res_1)
+}
+
+# if (trend == "sd_R") {
+#   res = readRDS("/Users/mac/Google Drive/CausalMARL/res_MARL/final/final_sd/final_sd.RDS")
+# }else{
+#   res = readRDS("/Users/mac/Google Drive/CausalMARL/res_MARL/final_0421/final_T/final_T.RDS")
+# }
+
+
+
+saveRDS(res, "/Users/mac/Google Drive/CausalMARL/res_MARL/final_0421/final_T/final_T.RDS")
 
 target_num = 4
 threshold_levels= c(9, 8, 7, 6)
@@ -117,7 +123,7 @@ gg_one_target <-function(dat, threshold,  y_axis = T){
     scale_shape_manual(values=c(1:n_est))  + # paste(title_prefix, name[l] ,sep = " ") # Threshold
     theme(plot.title = element_text(hjust = 0.5))
   
-  if(trend =="sd_R")g = g + ggtitle(paste(sep = "", "K = ", threshold)) + theme(plot.title = element_text(size = 15)) # , face = "bold"
+  if(trend =="sd_R")g = g + ggtitle(paste(sep = "", "K = ", threshold)) + theme(plot.title = element_text(size = 10)) # , face = "bold"
   
   g = g + ylim(0, NA)
   
@@ -130,34 +136,45 @@ gg_one_target <-function(dat, threshold,  y_axis = T){
       g = g + xlim(NA, 400)
       # g = g + scale_x_continuous(breaks = seq(100, 400, 100))
   }
-  
-  if (y_axis) {g = g + ylab("MSE")
-  }else{g = g + ylab(NULL) # ,axis.ticks.x=element_blank()
-  }
-  
+  g = g + ylab(NULL) 
+  # if (y_axis) {
+  #   g = g + ylab("MSE", element_text(size = 1222)) + theme(axis_title_y = element_text(size=1222, text='beef'))
+  # }else{g = g + ylab(NULL) # ,axis.ticks.x=element_blank()
+  # }
+  # g = g + font("ylab", size = 120)
   return(g)
 }
 
 ggs = list()
 for (l in c(1:target_num)) {
   ggs[[l]] = gg_one_target(data_targets[[l]], threshold_levels[l], y_axis = F) + 
-    theme(plot.margin = unit(c(0.1, 0.1, 0.1, -.1), "cm"))
+    theme(plot.margin = unit(c(0.1, 0.1, 0.1, -0.1), "cm"))
 }
 
-if(trend =="sd_R"){
-  g = ggarrange(ggs[[1]], ggs[[2]], ggs[[3]], ggs[[4]], # ggs[[5]], ggs[[6]], # ggs[[7]], ggs[[8]]
-                ncol = 4, nrow = 1, 
-                legend = "none",
-                align = "v")# , ggs[[3]], ggs[[4]]
+g = ggarrange(ggs[[1]], ggs[[2]], ggs[[3]], ggs[[4]], # ggs[[5]], ggs[[6]], # ggs[[7]], ggs[[8]]
+              ncol = 4, nrow = 1, 
+              legend = "none",
+              align = "v")# , ggs[[3]], ggs[[4]]
+
+# if(trend =="sd_R"){
+#   g = ggarrange(ggs[[1]], ggs[[2]], ggs[[3]], ggs[[4]], # ggs[[5]], ggs[[6]], # ggs[[7]], ggs[[8]]
+#                 ncol = 4, nrow = 1, 
+#                 legend = "none",
+#                 align = "v")# , ggs[[3]], ggs[[4]]
+# }else{
+#   g = ggarrange(ggs[[1]], ggs[[2]], ggs[[3]], ggs[[4]], # ggs[[5]], ggs[[6]], # ggs[[7]], ggs[[8]]
+#                 ncol = 4, nrow = 1, 
+#                 common.legend = TRUE, legend="bottom",
+#                 align = "v")# , ggs[[3]], ggs[[4]]
+# }
+
+if(trend == "Time"){
+  g1 = annotate_figure(g, left = text_grob(y_var, just ="centre",  
+                                           size = 10, rot = 90, hjust = -0.85, vjust = 0))# 
 }else{
-  g = ggarrange(ggs[[1]], ggs[[2]], ggs[[3]], ggs[[4]], # ggs[[5]], ggs[[6]], # ggs[[7]], ggs[[8]]
-                ncol = 4, nrow = 1, 
-                common.legend = TRUE, legend="bottom",
-                align = "v")# , ggs[[3]], ggs[[4]]
+  g1 = annotate_figure(g, left = text_grob(y_var, just ="centre",  
+                                           size = 10, rot = 90, hjust = 0, vjust = 0))# 
 }
-
-
-g1 = annotate_figure(g, left = text_grob(y_var, rot = 90, hjust = 0))
 # save
 print(g1)
 
@@ -170,4 +187,3 @@ if (trend == "sd_R") {
           width = 6.5, 
           height = 2.2,  units = c("in"), dpi = 1000 )
 }
-

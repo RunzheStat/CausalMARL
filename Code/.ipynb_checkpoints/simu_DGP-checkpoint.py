@@ -13,14 +13,13 @@ from _utility import *
         adj_mat: binary adjacent matrix
         [[O, D, M], A, R]
 """
-def DG_once(seed = 1, l = 5, T = 14 * 48, t_func = None, u_O_u_D = None, 
+def DG_once(seed = 1, l = 5, T = 14 * 48, t_func = None, u_D = 100, 
             w_A = 1, w_O = 1, sd_R  = 1, sd_D = 1, sd_O = 1, 
             u_O = None, 
            TARGET = False, target_policy = None, T_burn_in = 100):  
     """ prepare data (fixed)
     """
     M_in_R  = True
-    u_O_u_D = u_O_u_D
     
     poisO = True
     T = T + T_burn_in
@@ -58,7 +57,8 @@ def DG_once(seed = 1, l = 5, T = 14 * 48, t_func = None, u_O_u_D = None,
     # D: initial is the same with driver. then attract by the A and O. burn-in.
     """ TUNE
     """
-    u_D = np.mean(u_O) - u_O_u_D
+    # u_D = np.mean(u_O) - u_O_u_D
+    
     D = [arr([u_D for i in range(N)])]
     
     """ MAIN: state trasition and reward calculation [no action selection]

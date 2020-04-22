@@ -12,10 +12,12 @@ from numpy.random import normal as rnorm
 from numpy.random import uniform as runi
 from numpy.random import binomial as rbin
 from numpy.random import poisson as rpoisson
+import matplotlib.pyplot as plt
 from numpy.random import shuffle,randn, permutation # randn(d1,d2) is d1*d2 i.i.d N(0,1)
 
 # Numpy
 import numpy as np
+from numpy import mean, var, std, median
 from numpy import array as arr
 from numpy import sqrt, cos, sin, exp, dot, diag, ones, identity, quantile, zeros, roll, multiply, stack, concatenate
 from numpy import concatenate as v_add

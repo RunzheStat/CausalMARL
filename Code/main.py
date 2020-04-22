@@ -9,18 +9,20 @@ from simu_funs import *
 Args: 
     data: a length-N list for the trajactories of the N regions. data[i] is a length-T list, where data[i][t] is [S_{i,t}, A_{i,t}, R_{i,t}]. S_{i,t} is a vector, and A_{i,t} as well as R_{i,t} are scalars. 
     adj_mat: N * N adjacent matrix. binary values.
-    policies:
-        tp: a list (len-N) of target policies;
-        bp: a list (len-N) of  behaviour policy,
-        where
-            policy(s, a) = a probability 
-            policy(s, random_choose = true) =  a sampled action
     
+    tp, bp: list (len-N) policies for the target/ the behaviour
+        Specifically, we require the input policy (tp[i] or bp[i]) has the following function form policy(s, a = None, random_choose = False), such that
+            1. policy(s, a) = the probability for choosing action a given state s
+            2. policy(s, random_choose = true) =  a sampled action given state s, following this policy
+        for now, we assume s is the local state variable for that region. Later, this function will be extended to support all global state variables.
+        
     Ts, Ta: the spatial dependence functions required for Mean-Field. For example, Ts([S_1, ..., S_k]) = np.mean([S_1, ..., S_k], 0)
     
     dim_S_plus_Ts: a scalar. dimension of state plus dimension of Ts
-    t_func: If None, then time independent; instead, include t_func(t) in the state variable. For example, t_func(t) = t % 48
-        
+    t_func: If None, then time independent; instead, include t_func(t) in the state variable. For example, t_func(t) = t % 48. 
+        We assumed
+            1. t is a continuous time index, for now
+            2. t has not been put into the state variables (will automatically do this); and thus  dim_S_plus_Ts also does not count it. 
     
     penalty: a list of two ranges of penalty parameters for the value function-based estimator. For example, penalty = [[1e-4, 1e-5], [1e-4, 1e-5]].
     penalty_NMF: similar with penalty, for QV_NO_MeanField
@@ -54,11 +56,11 @@ def V_DR(data, adj_mat, tp, bp, Ts, Ta, dim_S_plus_Ts = 3 + 3,
     if Ts is None:
         def Ts(S_neigh):
             return np.mean(S_neigh, 0)
-    """ NOTE: we discretize Ta into three levels to reduce variance. 
-        The function Ta_disc can be found in utility.py and can be modified according to your setting
-    """
     if Ta is None:
         def Ta(A_neigh):
+            """ NOTE: we discretize Ta into three levels to reduce variance. 
+                The function Ta_disc can be found in utility.py and can be modified according to your setting
+            """
             return Ta_disc(np.mean(A_neigh, 0))
 
     a = now()
@@ -72,15 +74,11 @@ def V_DR(data, adj_mat, tp, bp, Ts, Ta, dim_S_plus_Ts = 3 + 3,
         ## transform data into transition tuples in the form DR-mena-field requires
         tuples_i = getRegionData(data[i], i, data_neigh, tp, Ts, Ta, mean_field = True, t_func = t_func)
         
-        
-        Ta_i = Ta_disc(np.mean([tp[j](s = None, random_choose = True) for j in neigh[i]])) # 0/1 for neigh based on tp -> mean -> disc
-        
         """ our method """
         Qi_diff, Vi = computeQV(tuples_i = tuples_i, R = Ri, n_neigh = n_neigh, 
                                 CV_QV = CV_QV, penalty_range = penalty, spatial = True)
-        
         if with_IS:
-            r = getWeight(tuples_i, i, policy0 = bp[i], policy1 = tp[i], Ta_i = Ta_i, dim_S_plus_Ts = dim_S_plus_Ts,
+            r = getWeight(tuples_i, i, policy0 = bp[i], policy1 = tp[i],  dim_S_plus_Ts = dim_S_plus_Ts,
                            t_func = t_func, n_neigh = n_neigh,
                           w_hidden = w_hidden, lr = lr,  n_layer = n_layer, 
                           batch_size = batch_size, max_iteration = max_iteration,  
@@ -107,7 +105,7 @@ def V_DR(data, adj_mat, tp, bp, Ts, Ta, dim_S_plus_Ts = 3 + 3,
                                 CV_QV = CV_QV, penalty_range = penalty, spatial = False)
             QV_NS = Vi_NS[0]
 
-            wi_NS = getWeight(tuples_i, i, policy0 = bp[i], policy1 = tp[i], Ta_i = Ta_i, dim_S_plus_Ts = dim_S_plus_Ts,
+            wi_NS = getWeight(tuples_i, i, policy0 = bp[i], policy1 = tp[i],  dim_S_plus_Ts = dim_S_plus_Ts,
                               t_func = t_func, n_neigh = n_neigh, 
                           w_hidden = w_hidden, lr = lr,  n_layer = n_layer, 
                           batch_size = batch_size, max_iteration = max_iteration,  epsilon = epsilon, 
@@ -121,11 +119,11 @@ def V_DR(data, adj_mat, tp, bp, Ts, Ta, dim_S_plus_Ts = 3 + 3,
         else:
             DR_V_NS = 0
             
+        
         """ 3. DR_NO_MF 
         """
         if with_MF:
-            tuples_i = getRegionData(data[i], i, data_neigh, tp, Ts, Ta, mean_field = False)
-            Ta_i = arr([tp[j](s = None, random_choose = True) for j in neigh[i]])
+            tuples_i = getRegionData(data[i], i, data_neigh, tp, Ts, Ta, mean_field = False, t_func = t_func)
 
             n_neigh = len(data_neigh)
             dim_NMF = int(dim_S_plus_Ts / 2 * (n_neigh + 1)) #???
@@ -134,7 +132,7 @@ def V_DR(data, adj_mat, tp, bp, Ts, Ta, dim_S_plus_Ts = 3 + 3,
                                           spatial = True, mean_field = False)
             QV_NMF = Vi_NMF[0]
             wi_NMF = getWeight(tuples_i, i, policy0 = bp[i], policy1 = tp[i], dim_S_plus_Ts = dim_NMF,
-                       t_func = t_func, n_neigh = n_neigh, Ta_i = Ta_i,
+                       t_func = t_func, n_neigh = n_neigh, 
                       w_hidden = w_hidden, lr = lr,  n_layer = n_layer, 
                       batch_size = batch_size, max_iteration = max_iteration,  
                       epsilon = epsilon, spatial = True, mean_field = False)[0]
@@ -168,7 +166,9 @@ Args:
     
 Returns:
     tuples_i: a list of transition tuples. 
-        tuples_i[t] = [S_it, A_it, R_it, Tsit, Tait, S_i(t+1), Tsi(t+1), pi_Sit_1, T_ait_1_pi]
+        tuples_i[t] = [S_it, A_it, R_it, Tsit, Tait, # 0 - 4
+                    S_i(t+1), Tsi(t+1), pi_Sit_1, T_ait_1_pi, # 5 - 8
+                    A_it1, pi_Sit, T_ait_pi] # 9 - 11
     data_neigh: 
         a (len-N_j) list of [index, data_at_that_index]
         data_at_that_index is a len-T list, where data_at_that_index[t] is [S_{i,t}, A_{i,t}, R_{i,t}]; 
@@ -178,30 +178,44 @@ def getRegionData(data_i, i, data_neigh, tp, Ts, Ta, mean_field = True, t_func =
     T = len(data_i) - 1
     tuples_i = []
     for t in range(T):
-        tuple_t = data_i[t].copy()
+        tuple_t = data_i[t].copy() # [S_it, A_it, R_it]
+        S_it1 = data_i[t + 1][0]
+        if t_func is not None:
+            time_index = t_func(t)
+            tuple_t[0] = np.append(tuple_t[0], time_index)       
+            S_it1 = np.append(S_it1, time_index)
+            
         if mean_field:
             Tsit = Ts([a[1][t][0] for a in data_neigh]) # a list (len-#neigh) of state at time t
             Tait = Ta([a[1][t][1] for a in data_neigh])
-            S_it1 = data_i[t + 1][0]
             A_it1 = data_i[t + 1][1]
             S1_neigh = [a[1][t + 1][0] for a in data_neigh]
             Tsit1 = arr(Ts(S1_neigh))
             pi_Sit_1 = tp[i](S_it1, random_choose = True)
-            T_ait_1_pi = Ta([tp[a[0]](a[1][t + 1][0], random_choose = True) for a in data_neigh])
+            pi_Sit = tp[i](tuple_t[0], random_choose = True)
+            if t_func is not None:
+                T_ait_1_pi = Ta([tp[a[0]](np.append(a[1][t + 1][0], time_index), random_choose = True) for a in data_neigh])
+                T_ait_pi = Ta([tp[a[0]](np.append(a[1][t][0], time_index), random_choose = True) for a in data_neigh])
+            else:
+                T_ait_1_pi = Ta([tp[a[0]](a[1][t + 1][0], random_choose = True) for a in data_neigh])
+                T_ait_pi = Ta([tp[a[0]](a[1][t][0], random_choose = True) for a in data_neigh])
         else:
             Tsit = np.concatenate([a[1][t][0] for a in data_neigh]) # a list (len-#neigh) of state at time t
             Tait = arr([a[1][t][1] for a in data_neigh])
-            S_it1 = data_i[t + 1][0]
             A_it1 = data_i[t + 1][1]
             S1_neigh = [a[1][t + 1][0] for a in data_neigh]
             Tsit1 = np.concatenate(S1_neigh)
             pi_Sit_1 = tp[i](S_it1, random_choose = True)
-            T_ait_1_pi = arr([tp[a[0]](a[1][t + 1][0], random_choose = True) for a in data_neigh])
-        if t_func is not None:
-            tuple_t[0] = np.append(tuple_t[0], t_func(t))       
-            S_it1 = np.append(S_it1, t_func(t))
+            pi_Sit = tp[i](tuple_t[0], random_choose = True)
+            if t_func is not None:
+                T_ait_1_pi = arr([tp[a[0]](np.append(a[1][t + 1][0], time_index), random_choose = True) for a in data_neigh])
+                T_ait_pi = arr([tp[a[0]](np.append(a[1][t][0], time_index), random_choose = True) for a in data_neigh])
+            else:
+                T_ait_1_pi = arr([tp[a[0]](a[1][t + 1][0], random_choose = True) for a in data_neigh])
+                T_ait_pi = arr([tp[a[0]](a[1][t][0], random_choose = True) for a in data_neigh])
+        
             
-        tuple_t += [Tsit, Tait, S_it1, Tsit1, pi_Sit_1, T_ait_1_pi, A_it1]
+        tuple_t += [Tsit, Tait, S_it1, Tsit1, pi_Sit_1, T_ait_1_pi, A_it1, pi_Sit, T_ait_pi]
         tuples_i.append(tuple_t)
     return tuples_i
 
@@ -210,14 +224,14 @@ def getRegionData(data_i, i, data_neigh, tp, Ts, Ta, mean_field = True, t_func =
 """ Compute the transition tuple density ratios for region i. [Breaking, Lihong]
 Args:  
     tuples_i[t] = [S_it, A_it, R_it, Tsit, Tait,  # 0 - 4
-                    S_i(t+1), Tsi(t+1), pi_Sit_1, T_ait_1_pi] # 5 - 8
+                    S_i(t+1), Tsi(t+1), pi_Sit_1, T_ait_1_pi, # 5 - 8 : pi_Sit_1 = \pi(S_{i, t + 1}), T_ait_1_pi = T_{a, i, t + 1}(\pi)
+                    A_it1, pi_Sit, T_ait_pi] # 9 - 11
         - what we want: SASR_i = [a list of [S,A,S',R]]; R is useless 
     policy0 = bp[i]
     policy1 = tp[i]
-    Ta_i: Ta variable for region i following tp (deterministic). Used to select related tuples in p_tp(Ta|s, Ts). 
 Returns: a vector of density ratios.
 """
-def getWeight(tuples_i, i, policy0, policy1, Ta_i, n_neigh = 8, dim_S_plus_Ts = 3 + 3, t_func = None, 
+def getWeight(tuples_i, i, policy0, policy1,  n_neigh = 8, dim_S_plus_Ts = 3 + 3, t_func = None, 
               w_hidden = 10, lr = 1e-4,  n_layer = 2, 
               batch_size = 64, max_iteration = 1001,  epsilon = 1e-3,
               spatial = True, mean_field = True):
@@ -226,27 +240,44 @@ def getWeight(tuples_i, i, policy0, policy1, Ta_i, n_neigh = 8, dim_S_plus_Ts = 
     
     # S, A, S', R
     if spatial:
-        def concateOne(tuplet):
-            # only for our cases
-            return [np.concatenate((tuplet[0], tuplet[3]), axis=None), # S
-                   [tuplet[1], tuplet[4]], # [A, Ta]
-                    np.concatenate((tuplet[5], tuplet[6]), axis=None), # S'
-                   tuplet[2]] # R
+        if mean_field:
+            def concateOne(tuplet):
+                # only for our cases
+                return [np.concatenate((tuplet[11], tuplet[0], tuplet[3]), axis=None), # S
+                       [tuplet[1], tuplet[4]], # [A, Ta]
+                        np.concatenate((tuplet[8], tuplet[5], tuplet[6]), axis=None), # S'
+                       tuplet[2], # R
+                       tuplet[10]]  # pi_i(S_t)
+                        
+        else:
+            def concateOne(tuplet):
+                # only for our cases
+                return [ np.concatenate((tuplet[0], tuplet[3]), axis=None), # S
+                       [tuplet[1], tuplet[4]], # [A, Ta]
+                        np.concatenate((tuplet[5], tuplet[6]), axis=None), # S'
+                        tuplet[2], # R
+                        [tuplet[10], tuplet[11]]
+                       ]
 
     else:
         def concateOne(tuplet):
             return [tuplet[0], tuplet[1],
-                    tuplet[5], tuplet[2]]
+                    tuplet[5], tuplet[2],
+                   tuplet[10]]
     SASR_i = [concateOne(tuplet) for tuplet in tuples_i]
     SASR_i = [SASR_i] # although we only need 1 layer of list
         
     # Dim and Initialization
     if spatial:
         if mean_field:
-            computeWeight = Density_Ratio_kernel(obs_dim = dim_S_plus_Ts, n_layer = n_layer, 
+            computeWeight = Density_Ratio_kernel(obs_dim = dim_S_plus_Ts + 1, n_layer = n_layer, 
                                      w_hidden = w_hidden, Learning_rate = lr, reg_weight = reg_weight)
         else:
-            computeWeight = Density_Ratio_kernel(obs_dim = 3 * (n_neigh + 1), n_layer = n_layer, 
+            if t_func is not None: 
+                obs_dim = 3 * (n_neigh + 1) + 1
+            else:
+                obs_dim = 3 * (n_neigh + 1)
+            computeWeight = Density_Ratio_kernel(obs_dim = obs_dim, n_layer = n_layer, 
                                      w_hidden = w_hidden, Learning_rate = lr, reg_weight = reg_weight)
     else:
         if t_func is not None: # general enough?
@@ -257,10 +288,11 @@ def getWeight(tuples_i, i, policy0, policy1, Ta_i, n_neigh = 8, dim_S_plus_Ts = 
                                      w_hidden = w_hidden, Learning_rate = lr, reg_weight = reg_weight)
 
     print_flag = False
-    weights = computeWeight.train(SASR_i, policy0, policy1, Ta_i = Ta_i, print_flag = print_flag, 
+    weights = computeWeight.train(SASR_i, policy0, policy1,  print_flag = print_flag, 
               batch_size = batch_size, max_iteration = max_iteration, n_neigh = n_neigh, 
                epsilon = epsilon, spatial = spatial, mean_field = mean_field)
     computeWeight.close_Session()
+    
     
     return weights, SASR_i
 
@@ -270,8 +302,8 @@ def getWeight(tuples_i, i, policy0, policy1, Ta_i, n_neigh = 8, dim_S_plus_Ts = 
 Args:
     tuples_i: required data for the region; 
         tuples_i[t] = [S_it, A_it, R_it, Ts_it, Ta_it, # 0 - 4
-                        S_i(t+1), Tsi(t+1), pi_Sit_1, T_ait_1_pi] # 5 - 8
-
+                        S_i(t+1), Tsi(t+1), pi_Sit_1, T_ait_1_pi, # 5 - 8
+                        A_it1, pi_Sit, T_ait_pi] # 9 - 11
 Returns:
     Vi: \hat{V}_{i, pi}
     Qi_diff: a vector (len-T) of Q^pi(tp) - Q^pi(bp)
@@ -319,8 +351,8 @@ def computeQV(tuples_i, R, n_neigh = None,
 Args:
         tuples_i: required data for the region; 
             tuples_i[t] = [S_it, A_it, R_it, Ts_it, Ta_it, # 0 - 4
-                            S_i(t+1), Tsi(t+1), pi_Sit_1, T_ait_1_pi] # 5 - 8
-        
+                            S_i(t+1), Tsi(t+1), pi_Sit_1, T_ait_1_pi, # 5 - 8
+                            A_it1, pi_Sit, T_ait_pi] # 9 - 11
 Returns:
         Vi: \hat{V}_{i,pi}
         Qi_diff: a vector (len-T) of Q^pi(tp) - Q^pi(bp)
