@@ -260,7 +260,7 @@ class Density_Ratio_kernel(object):
                     self.policy_ratio2: policy_ratio_test2
                     })
                 print('----Iteration = {}-----'.format(i))
-                printR("Testing error = {:.5}".format(test_loss))
+                print("Testing error = {:.5}".format(test_loss))
                 print('Regularization loss = {}'.format(reg_loss))
                 print('Norm_w = {:.5}'.format(norm_w)," || ", 'Norm_w_next = {:.5}'.format(norm_w_next))
                 Density_ratio = self.get_density_ratio(S)

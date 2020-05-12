@@ -1,0 +1,28 @@
+\begin{thebibliography}{1}
+
+\bibitem{francq2005central}
+Christian Francq and Jean-Michel Zako{\"\i}an.
+\newblock A central limit theorem for mixing triangular arrays of variables
+  whose dependence is allowed to grow with the sample size.
+\newblock {\em Econometric Theory}, 21(6):1165--1171, 2005.
+
+\bibitem{krebs2018}
+Johannes T.~N. Krebs.
+\newblock A large deviation inequality for {$\beta$}-mixing time series and its
+  applications to the functional kernel regression model.
+\newblock {\em Statist. Probab. Lett.}, 133:50--58, 2018.
+
+\bibitem{liu2018}
+Qiang Liu, Lihong Li, Ziyang Tang, and Dengyong Zhou.
+\newblock Breaking the curse of horizon: Infinite-horizon off-policy
+  estimation.
+\newblock In {\em Advances in Neural Information Processing Systems}, pages
+  5356--5366, 2018.
+
+\bibitem{shi2020reinforcement}
+Chengchun Shi, Xiaoyu Wang, Shikai Luo, Rui Song, Hongtu Zhu, and Jieping Ye.
+\newblock A reinforcement learning framework for time-dependent causal effects
+  evaluation in a/b testing.
+\newblock {\em arXiv preprint arXiv:2002.01711}, 2020.
+
+\end{thebibliography}

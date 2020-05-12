@@ -79,7 +79,8 @@ class Density_Ratio_kernel(object):
         ### Transform as NN loss
         # The normalization part in that paper
         self.loss = tf.squeeze(loss_xx) #/(norm_w*norm_w2*norm_K)
-        self.train_op = tf.train.AdamOptimizer(Learning_rate).minimize(self.loss) # mute the later part?+reg_weight * self.reg_loss # not mentioned in the paper
+        self.reg_loss = tf.reduce_sum(tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES, 'w'))
+        self.train_op = tf.train.AdamOptimizer(Learning_rate).minimize(self.loss +reg_weight * self.reg_loss) 
 
         # Debug
         self.debug1 = tf.reduce_mean(w1)
@@ -249,7 +250,7 @@ class Density_Ratio_kernel(object):
                 sn_test2 = SN_test[subsamples]
                 policy_ratio_test2 = (PI1_test[subsamples] + epsilon)/(PI0_test[subsamples] + epsilon)
 
-                test_loss, norm_w, norm_w_next = self.sess.run([self.loss, self.debug1, self.debug2], feed_dict = {
+                test_loss, reg_loss, norm_w, norm_w_next = self.sess.run([self.loss, self.reg_loss, self.debug1, self.debug2], feed_dict = {
                     self.med_dist: med_dist,
                     self.state: s_test,
                     self.next_state: sn_test,
@@ -260,6 +261,7 @@ class Density_Ratio_kernel(object):
                     })
                 print('----Iteration = {}-----'.format(i))
                 printR("Testing error = {:.5}".format(test_loss))
+                print('Regularization loss = {}'.format(reg_loss))
                 print('Norm_w = {:.5}'.format(norm_w)," || ", 'Norm_w_next = {:.5}'.format(norm_w_next))
                 Density_ratio = self.get_density_ratio(S)
                 T = Density_ratio * PI1 / PI0 
