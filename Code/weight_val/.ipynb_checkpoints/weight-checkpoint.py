@@ -7,7 +7,7 @@ The majority is adapted from the source code maintained on on Github for the pap
 ##########################################################################################################################################################
 import numpy as np
 from utils import *
-import tensorflow as tf # tf.__version__ = 1.13.2
+import tf as tf # tf.__version__ = 1.13.2
 from time import sleep
 import sys
 from scipy.stats import binom
