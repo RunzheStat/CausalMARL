@@ -1,0 +1,52 @@
+---
+title: "Spatiotemporal Causal Effects Evaluation: A Multi-Agent Reinforcement Learning Framework"
+output: html_notebook
+---
+
+This repository is the official implementation of the paper "Spatiotemporal Causal Effects Evaluation: A Multi-Agent Reinforcement Learning Framework" submitted to NeurIPS 2020. 
+
+## Requirements
+* Python version: Python 3.6.8 :: Anaconda custom (64-bit)
+* Main packages for the proposed estimator
+    - numpy
+    - scipy
+    - sklearn
+    - tensorflow == 1.13.2
+    - itertools
+* Additional packages for experiments
+    - pickle
+    - multiprocessing
+    - os
+    - time
+    - sys
+    - logging
+    - warnings
+
+## File Overview
+* `main.py`: main function for the proposed estimator and its components
+* `weight.py`: neural network for the weight estimation part
+* `utils.py`: helper functions for `main.py` and simulation parts
+* `simu.py`: experiment script for reproducing the results in the paper
+* `simu_funs.py`: main functions for the simulation experiment
+* `simu_DGP.py`: data generating functions for the simulation experiment
+
+
+## Reproduce simulation results
+
+To reproduce the results presented in Figure 2, change the working directory to the main folder and run `python simu.py`, which generates two files `final_sd.txt` and `final_T.txt`. Read them with `pickle.load` and then we can get the following results that Figure 2.b is based on. 
+
+
+
+### Top plots
+
+```{r echo=FALSE}
+readRDS("/Users/mac/Google Drive/CausalMARL/Code/readme_table_sd_R.rds")
+```
+
+### Bottom plots
+
+```{r echo=FALSE}
+a = readRDS("/Users/mac/Google Drive/CausalMARL/Code/readme_table_Time.rds")
+a[1:dim(a)[1],1] = a[1:dim(a)[1],1] * 24 * 2
+a
+```

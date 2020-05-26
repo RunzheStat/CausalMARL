@@ -1,8 +1,8 @@
 library("ggplot2")
 library("reshape2")
 library("ggpubr")
-library(latex2exp)
-library(readr)
+library("latex2exp")
+library("readr")
 
 # Data --------------------------------------------------------------------
 
@@ -11,32 +11,42 @@ library(readr)
 
 # Data --------------------------------------------------------------------
 res = list()
+path_plot = "/Users/mac/Google Drive/CausalMARL/res_MARL/temp_py/"
 
- y_var = "MSE"
+## variable to plot 
+y_var = "MSE"
 # y_var = "bias"
 # y_var = "std"
 # y_var = "sd_MSE"
 
-# trend = "sd_R"
-trend = "Time"
-# trend = "day"
+## the trend variable for x-axis
+# x.trend = "sd_R"
+x.trend = "Time"
+# x.trend = "day"
 
-path_plot = "/Users/mac/Google Drive/CausalMARL/res_MARL/temp_py/"
-
+trend = x.trend
 if (trend == "sd_R") {
   setting_range = seq(0, 30, 5)
+  for (i in 1:length(setting_range)) {# x-axis
+    path = paste(sep = "", path_plot, "res_sd_", y_var, i, ".txt")
+    res_1 <- read_csv(path,
+                      col_names = FALSE)
+    # res_1 = res_1[c(3,4,6,7),]
+    res[[i]] = abs(res_1)
+  }
 }else{
   setting_range = c(2, 3, 4, 5, 6, 7, 8)
+  for (i in 1:length(setting_range)) {# x-axis
+    path = paste(sep = "", path_plot, "res_T_", y_var, i, ".txt")
+    res_1 <- read_csv(path,
+                      col_names = FALSE)
+    # res_1 = res_1[c(3,4,6,7),]
+    res[[i]] = abs(res_1)
+  }
+  
 }
 
 
-for (i in 1:length(setting_range)) {# x-axis
-  path = paste(sep = "", path_plot, "res_T_", y_var, i, ".txt")
-  res_1 <- read_csv(path,
-                    col_names = FALSE)
-  # res_1 = res_1[c(3,4,6,7),]
-  res[[i]] = abs(res_1)
-}
 
 # if (trend == "sd_R") {
 #   res = readRDS("/Users/mac/Google Drive/CausalMARL/res_MARL/final/final_sd/final_sd.RDS")
@@ -46,8 +56,9 @@ for (i in 1:length(setting_range)) {# x-axis
 
 
 
-saveRDS(res, "/Users/mac/Google Drive/CausalMARL/res_MARL/final_0421/final_T/final_T.RDS")
+# saveRDS(res, "/Users/mac/Google Drive/CausalMARL/res_MARL/final_0421/final_T/final_T.RDS")
 
+## number of sub-plots for different target policies
 target_num = 4
 threshold_levels= c(9, 8, 7, 6)
 
@@ -105,6 +116,23 @@ for (target in 1:target_num) {
   data_targets[[target]] = mdf
 }
 
+
+# Transform tables to NIPS Readme -----------------------------------------
+
+transRawTablesToFinalReadme <- function(data_targets){
+  table.readme = list()
+  for (target in 1:target_num){
+    table.readme[[target]] = data_targets[[target]]
+    table.readme[[target]][["target"]] = threshold_levels[target]
+  }
+  return(do.call(rbind, table.readme))
+}
+
+table.readme = transRawTablesToFinalReadme(data_targets)
+
+saveRDS(table.readme, paste(sep = "", "readme_table_", x.trend, ".rds"))
+
+
 # plotting ----------------------------------------------------------------
 
 gg_one_target <-function(dat, threshold,  y_axis = T){
@@ -145,45 +173,44 @@ gg_one_target <-function(dat, threshold,  y_axis = T){
   return(g)
 }
 
+
+### Combine plots --------
+
 ggs = list()
 for (l in c(1:target_num)) {
   ggs[[l]] = gg_one_target(data_targets[[l]], threshold_levels[l], y_axis = F) + 
     theme(plot.margin = unit(c(0.1, 0.1, 0.1, -0.1), "cm"))
 }
 
-g = ggarrange(ggs[[1]], ggs[[2]], ggs[[3]], ggs[[4]], # ggs[[5]], ggs[[6]], # ggs[[7]], ggs[[8]]
-              ncol = 4, nrow = 1, 
-              legend = "none",
-              align = "v")# , ggs[[3]], ggs[[4]]
 
-# if(trend =="sd_R"){
-#   g = ggarrange(ggs[[1]], ggs[[2]], ggs[[3]], ggs[[4]], # ggs[[5]], ggs[[6]], # ggs[[7]], ggs[[8]]
-#                 ncol = 4, nrow = 1, 
-#                 legend = "none",
-#                 align = "v")# , ggs[[3]], ggs[[4]]
-# }else{
-#   g = ggarrange(ggs[[1]], ggs[[2]], ggs[[3]], ggs[[4]], # ggs[[5]], ggs[[6]], # ggs[[7]], ggs[[8]]
-#                 ncol = 4, nrow = 1, 
-#                 common.legend = TRUE, legend="bottom",
-#                 align = "v")# , ggs[[3]], ggs[[4]]
-# }
+
 
 if(trend == "Time"){
+  g = ggarrange(ggs[[1]], ggs[[2]], ggs[[3]], ggs[[4]], # ggs[[5]], ggs[[6]], # ggs[[7]], ggs[[8]]
+                ncol = 4, nrow = 1, 
+                legend = "bottom",
+                common.legend = T, 
+                align = "v")# , ggs[[3]], ggs[[4]]
   g1 = annotate_figure(g, left = text_grob(y_var, just ="centre",  
                                            size = 10, rot = 90, hjust = -0.85, vjust = 0))# 
+  
 }else{
+  g = ggarrange(ggs[[1]], ggs[[2]], ggs[[3]], ggs[[4]], # ggs[[5]], ggs[[6]], # ggs[[7]], ggs[[8]]
+                ncol = 4, nrow = 1, 
+                legend = "none",
+                align = "v")# , ggs[[3]], ggs[[4]]
   g1 = annotate_figure(g, left = text_grob(y_var, just ="centre",  
                                            size = 10, rot = 90, hjust = 0, vjust = 0))# 
 }
 # save
 print(g1)
-
+# _NoNaive
 if (trend == "sd_R") {
-  ggsave( filename = paste(sep = "", "/Users/mac/Desktop/", y_var, "_sd.png"),  plot = g1,
+  ggsave( filename = paste(sep = "", "/Users/mac/Desktop/", y_var, "_sd_NoNaive.png"),  plot = g1,
           width = 6.5, 
           height = 2.1,  units = c("in"), dpi = 1000 )
 }else{
-  ggsave( filename = paste(sep = "", "/Users/mac/Desktop/", y_var, "_T.png"),  plot = g1,
+  ggsave( filename = paste(sep = "", "/Users/mac/Desktop/", y_var, "_T_NoNaive.png"),  plot = g1,
           width = 6.5, 
           height = 2.2,  units = c("in"), dpi = 1000 )
 }
