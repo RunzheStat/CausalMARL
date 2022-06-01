@@ -1,7 +1,16 @@
 
 # A MULTI-AGENT REINFORCEMENT LEARNING FRAMEWORK FOR OFF-POLICY EVALUATION IN TWO-SIDED MARKETS
 
-This repository contains the implementation for the paper "A MULTI-AGENT REINFORCEMENT LEARNING FRAMEWORK FOR OFF-POLICY EVALUATION IN TWO-SIDED MARKETS" (under revision at AOAS) in Python.
+This repository contains the implementation for the paper "A MULTI-AGENT REINFORCEMENT LEARNING FRAMEWORK FOR OFF-POLICY EVALUATION IN TWO-SIDED MARKETS" (minor revision at AOAS) in Python.
+
+## Summary of the paper
+
+The two-sided markets such as ride-sharing companies often involve a group of subjects who are making sequential decisions across time and/or location. With the rapid development of smart phones and internet of things, they have substantially transformed the transportation landscape of human
+beings. In this paper we consider large-scale fleet management in ride-sharing companies that involve multiple units in different areas receiving sequences
+of products (or treatments) over time. Major technical challenges, such as policy evaluation, arise in those studies because (i) spatial and temporal proximities induce interference between locations and times; and (ii) the large number of locations results in the curse of dimensionality. To address both
+challenges simultaneously, we introduce a multi-agent reinforcement learning (MARL) framework for carrying policy evaluation in these studies. We
+propose novel estimators for mean outcomes under different products that are consistent despite the high-dimensionality of state-action space. The proposed estimator works favorably in simulation experiments. We further illustrate our method using a real dataset obtained from a two-sided marketplace company to evaluate the effects of applying different subsidizing policies.
+
 
 
 ## Requirements
