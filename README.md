@@ -13,6 +13,8 @@ propose novel estimators for mean outcomes under different products that are con
 
 <img align="center" src="CausalDiagram.png" alt="drawing" width="700">
 
+**Figure**: Causal diagram for a multi-agent system with two agents. $(S_{j,t}, A_{j,t}, R_{j,t})$ represents the statetreatment-outcome triplet of the $j$th agent at time $t$.
+
 ## Requirements
 * Python version: Python 3.6.8 :: Anaconda custom (64-bit)
 * Main packages for the proposed estimator
