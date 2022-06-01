@@ -11,7 +11,7 @@ of products (or treatments) over time. Major technical challenges, such as polic
 challenges simultaneously, we introduce a multi-agent reinforcement learning (MARL) framework for carrying policy evaluation in these studies. We
 propose novel estimators for mean outcomes under different products that are consistent despite the high-dimensionality of state-action space. The proposed estimator works favorably in simulation experiments. We further illustrate our method using a real dataset obtained from a two-sided marketplace company to evaluate the effects of applying different subsidizing policies.
 
-
+<img align="center" src="CausalDiagram.png" alt="drawing" width="700">
 
 ## Requirements
 * Python version: Python 3.6.8 :: Anaconda custom (64-bit)
